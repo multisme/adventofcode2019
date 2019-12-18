@@ -19,6 +19,16 @@ fn read_input() -> std::string::String {
     s
 }
 
+fn additionnal_fuel(weight: i32) -> i32  {
+
+    let mut additional_ful = weight / 3 - 2;
+    let mut res2: i32 = 0;
+    while additional_ful > 0 {
+        res2 += additional_ful;
+        additional_ful = additional_ful / 3 - 2;
+    }
+    res2
+}
 
 fn main() {
     let s = read_input();
@@ -29,11 +39,6 @@ fn main() {
 
     // Second answer
 
-    let mut res2 = 0;
-    let mut additional_ful = res / 3 - 2;
-    while additional_ful > 0 {
-        res2 += additional_ful;
-        additional_ful = additional_ful / 3 - 2;
-    }
-    println!("result: 1 {} 2 {}", res, res2);
+    let mut res2: i32 = split.iter().map(|x| additionnal_fuel(*x)).sum();
+    println!("result: answer 1 {} answer 2 {}", res, res2);
 }
