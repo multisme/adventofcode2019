@@ -36,6 +36,9 @@ fn compute_paths(wire: &str, mut start: (i32, i32)) -> BTreeMap<(i32, i32), i32>
         let direction = m.chars().nth(0).unwrap();
         let steps = m[1..].parse::<i32>().unwrap();
 
+        // Get for each path the coordinates of the points of that path and the amount of steps to
+        // get to each of those coordinates
+        
         //Managage up turn
         if direction == 'U'{
             let new_start = (start.0 + steps, start.1);
@@ -74,7 +77,7 @@ fn compute_paths(wire: &str, mut start: (i32, i32)) -> BTreeMap<(i32, i32), i32>
             start = new_start;
         }
         index += steps;
-        coords.insert(start, 0);
+        coords.insert(start, index);
         // coords.insert(start);
     //    println!("start {:?} {:?} {:?} {:?}", start, direction, steps, index);
     }
@@ -92,8 +95,9 @@ fn main() {
 
     //Computes the full paths
     let mut path1 = compute_paths(wire1, (0, 0));
-    println!("***************************************************");
     let mut path2 = compute_paths(wire2, (0, 0));
+    
+    //remove the start of the path
     path1.remove(&(0,0));
     path2.remove(&(0,0));
 
