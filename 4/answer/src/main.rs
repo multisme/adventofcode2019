@@ -121,5 +121,4 @@ fn main() {
     let count1 = to_checks.iter().filter(|x| test_adjacent_digit(x)).count();
     let count2 = to_checks.iter().filter(|x| test_only_2_adjacent_digit(x)).count();
     println!("result one: {:?} result two: {:?}", count1, count2);
-    //let range: Range = Range{start: str_range[0], end: str_range[1]};
 }
