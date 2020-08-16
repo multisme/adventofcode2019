@@ -35,11 +35,28 @@ fn _print_graph(graph: &HashMap<&str, Node>){
     }
 }
 
-fn count_orbits(star_chart: & mut HashMap<&str, Node>, name: &str) -> u32 {
+fn compute_path_to_center<'a>(star_chart: &'a HashMap<&str, Node>, name: &str) -> Vec<&'a str>{
+    let mut path = Vec::new();
+    let mut end = false;
+    let mut current_node = star_chart.get(name).unwrap();
+
+    while end == false{
+        match star_chart.get(current_node.name) {
+            Some(previous) => {
+                path.push(current_node.name);
+                current_node = previous;
+            },
+            _ => { end = true }
+        }
+    }
+    return path;
+}
+
+fn count_orbits(star_chart: &mut HashMap<&str, Node>, name: &str) -> u32 {
     match star_chart.get(name) {
         Some(previous) => {
-           let name = previous.name;
-           count_orbits(star_chart, name) + 1
+            let name = previous.name;
+            count_orbits(star_chart, name) + 1
         },
         _ => 0 
     }
@@ -57,16 +74,16 @@ fn compute_chart_orbits(star_chart: &mut HashMap<&str, Node>) -> u32{
     return final_count
 }
 
-fn compute_path_spaceship(star_chart: &mut HashMap<&str, Node>) -> usize{
-    let start_name = "YOU";
-    let end_name = "SAN";
 
-    let start = star_chart.get(start_name).unwrap();
-    let end = star_chart.get(end_name).unwrap(); 
-    for (index, object) in start.before.iter().enumerate().rev(){
-        for (index2, others) in end.before.iter().enumerate().rev(){
+
+fn compute_path_spaceship(star_chart: &mut HashMap<&str, Node>) -> usize{
+
+    let start = compute_path_to_center(star_chart, "YOU");
+    let end = compute_path_to_center(star_chart, "SAN") ; 
+    for (index, object) in start.iter().enumerate(){
+        for (index2, others) in end.iter().enumerate(){
             if others == object{
-                return index + index2
+                return (index) + (index2);
             }
         }
     }
@@ -88,6 +105,7 @@ fn get_data(input: std::str::SplitWhitespace) -> HashMap<&str, Node>{
 
 fn main() {
     //Read input and split by lines
+
     let file_input = read_input("../6.txt");
     //Get the lines from the input
     let input = file_input.split_whitespace();
@@ -98,5 +116,5 @@ fn main() {
     //print_graph(&graph);
     let path_size = compute_path_spaceship(&mut graph);
     println!("{:?} {:?}", final_count, path_size);
-   // println!(" The input is: {:?}", input);
+    // println!(" The input is: {:?}", input);
 }
