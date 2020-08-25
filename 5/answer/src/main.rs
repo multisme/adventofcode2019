@@ -2,100 +2,104 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
-static STORED_INPUT: i32 = 5;
+struct Data<'a> {
+    // The 'a defines a lifetime
+    memory: &'a mut Vec<i32>,
+    input: i32
+}
 
-fn add(memory: &mut Vec<i32>, index: &mut usize,  positions: Vec<char> ) ->(){
+fn add(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->(){
     //  println!("instructions {:?} {:?} {:?}", memory[index], index, positions);
-    let output = memory[*index + 3] as usize;
-    let mark = memory[*index + 2];
-    let val2 = if positions[1] == '0' { memory[mark as usize] } else {mark} ;
-    let mark = memory[*index + 1];
-    let val1 = if positions[2] == '0' { memory[mark as usize] } else {mark} ;
-    memory[output as usize] = val1 + val2;
+    let output = data.memory[*index + 3] as usize;
+    let mark = data.memory[*index + 2];
+    let val2 = if positions[1] == '0' { data.memory[mark as usize] } else {mark} ;
+    let mark = data.memory[*index + 1];
+    let val1 = if positions[2] == '0' { data.memory[mark as usize] } else {mark} ;
+    data.memory[output as usize] = val1 + val2;
     *index += 4;
 }
 
 
-fn display(memory: &mut Vec<i32>, index: &mut usize,  positions: Vec<char>) ->(){
+fn display(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
     if positions[2] == '1'{
         let address = *index + 1;
-        println!("{:?}", memory[address]);
+        println!("{:?}", data.memory[address]);
     } else {
-        let address = memory[*index + 1] as usize;
-        println!("{:?}", memory[address]);
+        let address = data.memory[*index + 1] as usize;
+        println!("{:?}", data.memory[address]);
     }
     *index += 2;
 }
 
 
-fn jump_if_true(memory: &mut Vec<i32>, index: &mut usize,  positions: Vec<char>) ->(){
-    let address = if positions[2] == '0' { memory[*index + 1] as usize } else { *index + 1 };
-    if memory[address] != 0 {
-        let address = if positions[1] == '0' { memory[*index + 2] as usize} else { *index + 2 };
-        *index = memory[address] as usize;
+fn jump_if_true(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
+    let address = if positions[2] == '0' { data.memory[*index + 1] as usize } else { *index + 1 };
+    if data.memory[address] != 0 {
+        let address = if positions[1] == '0' { data.memory[*index + 2] as usize} else { *index + 2 };
+        *index = data.memory[address] as usize;
     } else {
         *index += 3;
     }
 }
 
 
-fn jump_if_false(memory: &mut Vec<i32>, index: &mut usize,  positions: Vec<char>) ->(){
-    let address = if positions[2] == '0' { memory[*index + 1] as usize} else { *index + 1 };
-    if memory[address] == 0 {
-        let address = if positions[1] == '0' { memory[*index + 2] as usize} else { *index + 2 };
-        *index = memory[address] as usize;
+fn jump_if_false(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
+    let address = if positions[2] == '0' { data.memory[*index + 1] as usize} else { *index + 1 };
+    if data.memory[address] == 0 {
+        let address = if positions[1] == '0' { data.memory[*index + 2] as usize} else { *index + 2 };
+        *index = data.memory[address] as usize;
     } else {
         *index += 3;
     }
 }
 
 
-fn less_than(memory: &mut Vec<i32>, index: &mut usize,  positions: Vec<char>) ->(){
+fn less_than(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
 
-    let address = if positions[3] == '0'{ memory[*index + 3] as usize } else { *index + 3 };
-    let mark = memory[*index + 2];
-    let val2 = if positions[1] == '0' { memory[mark as usize] } else {mark} ;
-    let mark = memory[*index + 1];
-    let val1 = if positions[2] == '0' { memory[mark as usize] } else {mark} ;
-    memory[address] = if val1 < val2 { 1 } else { 0 };
+    let address = if positions[3] == '0'{ data.memory[*index + 3] as usize } else { *index + 3 };
+    let mark = data.memory[*index + 2];
+    let val2 = if positions[1] == '0' { data.memory[mark as usize] } else {mark} ;
+    let mark = data.memory[*index + 1];
+    let val1 = if positions[2] == '0' { data.memory[mark as usize] } else {mark} ;
+    data.memory[address] = if val1 < val2 { 1 } else { 0 };
     *index += 4;
 }
 
 
-fn equal(memory: &mut Vec<i32>, index: &mut usize,  positions: Vec<char>) ->(){
-    let address = if positions[3] == '0'{ memory[*index + 3] as usize } else { *index + 3 };
-    let mark = memory[*index + 2];
-    let val2 = if positions[1] == '0' { memory[mark as usize] } else {mark} ;
-    let mark = memory[*index + 1];
-    let val1 = if positions[2] == '0' { memory[mark as usize] } else {mark} ;
-    memory[address] = if val1 == val2 { 1 } else { 0 };
+fn equal(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
+    let address = if positions[3] == '0'{ data.memory[*index + 3] as usize } else { *index + 3 };
+    let mark = data.memory[*index + 2];
+    let val2 = if positions[1] == '0' { data.memory[mark as usize] } else {mark} ;
+    let mark = data.memory[*index + 1];
+    let val1 = if positions[2] == '0' { data.memory[mark as usize] } else {mark} ;
+    data.memory[address] = if val1 == val2 { 1 } else { 0 };
     *index += 4;
 }
 
 
-fn multiply(memory: &mut Vec<i32>, index: &mut usize,  positions: Vec<char> ) ->(){
-    //  println!("instructions {:?} {:?} {:?}", memory[index], index, positions);
-    let output = memory[*index + 3] as usize;
-    let mark = memory[*index + 2];
-    let val2 = if positions[1] == '0' { memory[mark as usize] } else {mark} ;
-    let mark = memory[*index + 1];
-    let val1 = if positions[2] == '0' { memory[mark as usize] } else {mark} ;
-    memory[output as usize] = val1 * val2;
+fn multiply(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->(){
+    //  println!("instructions {:?} {:?} {:?}", data.memory[index], index, positions);
+    let output = data.memory[*index + 3] as usize;
+    let mark = data.memory[*index + 2];
+    let val2 = if positions[1] == '0' { data.memory[mark as usize] } else {mark} ;
+    let mark = data.memory[*index + 1];
+    let val1 = if positions[2] == '0' { data.memory[mark as usize] } else {mark} ;
+    data.memory[output as usize] = val1 * val2;
     *index += 4;
 }
 
 
-fn _nothing(_memory: &mut Vec<i32>, _index: &mut usize,  _positions: Vec<char> ) ->(){
+fn _nothing(_data: &mut Data, _index: &mut usize,  _positions: Vec<char> ) ->(){
 }
 
 
-fn store(memory: &mut Vec<i32>, index: &mut usize,  positions: Vec<char> ) ->(){
+fn store(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->(){
     if positions[2] == '1'{
         let address = *index + 1;
-        memory[address] = STORED_INPUT;
+        data.memory[address] = data.input;
     } else {
-        let address = memory[(*index + 1)] as usize;
-        memory[address] = STORED_INPUT; 
+        let address = data.memory[(*index + 1)] as usize;
+        data.memory[address] = data.input; 
     }
     *index += 2;
 }
@@ -116,37 +120,37 @@ impl To10ext for i32 {
 }
 
 
-fn run_data(memory:&mut Vec<i32>) -> (){
+fn run_data(data: &mut Data) -> (){
     let mut index: usize = 0;
-    let len = memory.len();
+    let len = data.memory.len();
 
     while index < len {
 
-        let positions = memory[index].parse_decimal(); 
+        let positions = data.memory[index].parse_decimal(); 
         let instruction = positions[4];
         if instruction == '1'{
-            add(memory, &mut index, positions);
+            add(data, &mut index, positions);
         } else if instruction == '2'{
-            multiply(memory, &mut index, positions);
+            multiply(data, &mut index, positions);
         }else if instruction == '3' {
-            store(memory, &mut index, positions);
+            store(data, &mut index, positions);
         } else if instruction == '4' {
-            display(memory, &mut index, positions);
+            display(data, &mut index, positions);
         } else if instruction == '5'{
-            jump_if_true(memory, &mut index, positions);
+            jump_if_true(data, &mut index, positions);
         } else if instruction == '6'{
-            jump_if_false(memory, &mut index, positions);
+            jump_if_false(data, &mut index, positions);
         } else if instruction == '7'{
-            less_than(memory, &mut index, positions);
+            less_than(data, &mut index, positions);
         } else if instruction == '8'{
-            equal(memory, &mut index, positions);
+            equal(data, &mut index, positions);
         } else if instruction == '9' {
             return 
         } else{
             println!("error");
             return;
         }
-//            println!("{:?} {:?}", memory, index);
+//            println!("{:?} {:?}", data, index);
     }
 }
 
@@ -178,6 +182,11 @@ fn main() {
         None => ""
     };
     //println!(" The input is: {:?}", input);
-    let mut memory: Vec<i32> = input.split(",").map(|x| x.parse::<i32>().unwrap()).collect();
-    run_data(&mut memory);
+    let memory: Vec<i32> = input.split(",").map(|x| x.parse::<i32>().unwrap()).collect();
+    // Input is 1
+    let mut data = Data {memory: &mut memory.clone(), input: 1};
+    run_data(&mut data);
+    //Input is 5
+    let mut data = Data {memory: &mut memory.clone(), input: 5};
+    run_data(&mut data);
 }
