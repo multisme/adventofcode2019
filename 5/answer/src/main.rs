@@ -2,6 +2,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
+
 struct Data<'a> {
     // The 'a defines a lifetime
     memory: &'a mut Vec<i32>,
