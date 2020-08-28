@@ -1,16 +1,24 @@
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
+// Used for Permutation
 use itertools::Itertools;
+// Nultithreading
+use std::sync::mpsc::{Sender, Receiver};
+use std::sync::mpsc;
+use std::thread;
 
 
-struct Data<'a> {
+#[derive(Debug)]
+struct Data {
     // The 'a defines a lifetime
-    memory: &'a mut Vec<i32>,
+    memory:  Vec<i32>,
     memory_index: usize,
     input: Vec<i32>,
     input_index: usize,
-    output: i32
+    output: i32,
+    input_channel: Option<Receiver<i32>>,
+    output_channel: Option<Sender<i32>>
 }
 
 #[derive(Debug)]
@@ -35,14 +43,19 @@ fn add(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->(){
 fn display(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
     if positions[2] == '1'{
         let address = *index + 1;
-   //     println!("{:?}", data.memory[address]);
+        //     println!("{:?}", data.memory[address]);
         data.output = data.memory[address]
     } else {
         let address = data.memory[*index + 1] as usize;
-   //     println!("{:?}", data.memory[address]);
+        //     println!("{:?}", data.memory[address]);
         data.output = data.memory[address]
     }
+    let ouput_entry = &data.output_channel;
     *index += 2;
+    match ouput_entry {
+        Some(rx) => { rx.send(data.output); }
+        _ => return
+    }
 }
 
 
@@ -107,6 +120,13 @@ fn _nothing(_data: &mut Data, _index: &mut usize,  _positions: Vec<char> ) ->(){
 
 
 fn store(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->(){
+    if data.input.len() <= data.input_index {
+        let input = &data.input_channel;
+        match input{
+            Some(rx) => { data.input.push(rx.recv().unwrap())},
+            _ => return
+        }
+    }
     if positions[2] == '1'{
         let address = *index + 1;
         data.memory[address] = data.input[data.input_index];
@@ -159,12 +179,13 @@ fn run_data(data: &mut Data) -> usize {
         } else if instruction == '8'{
             equal(data, &mut index, positions);
         } else if instruction == '9' {
+            println!("result? {:?}", data.output);
             break
         } else{
             println!("error");
             break
         }
-//            println!("{:?} {:?}", data, index);
+        //            println!("{:?} {:?}", data, index);
     }
     index
 }
@@ -192,7 +213,7 @@ fn first_answer(memory: &Vec<i32>) -> (){
     let mut results_1: Vec<OutputSignal> = Vec::new();
     //try all permutations
     for p in  (0..5).permutations(5){
-        let mut data = Data {memory: &mut memory.clone(), memory_index: 0, input: vec![], input_index: 0, output: 0};
+        let mut data = Data {memory: memory.clone(), memory_index: 0, input: vec![], input_index: 0, output: 0, input_channel: None, output_channel: None};
         for phase in &p {
             data.input_index = 0;
             data.input = vec![*phase, data.output];
@@ -204,32 +225,73 @@ fn first_answer(memory: &Vec<i32>) -> (){
     println!("First answer [phase, value]{:?}", max);
 }
 
+fn connect_amps(input_amp: &mut Data, output_amp: &mut Data) -> () {
+    let (tx, rx): (Sender<i32>, Receiver<i32>) = mpsc::channel();
+    output_amp.output_channel = Some(tx);
+    input_amp.input_channel = Some(rx);
+}
+
 fn second_answer(memory: &Vec<i32>) -> (){
     let mut results_2: Vec<OutputSignal> = Vec::new();
-    /*
+
     for p in  (5..10).permutations(5){
-    let mut datas: Vec<Data> = Vec::new();
-    datas.push(Data {memory: &mut memory, memory_index: 0, input: vec![p[0]], input_index: 0, output: 0});
-    datas.push(Data {memory: &mut memory.clone(), memory_index: 0, input: vec![p[0]], input_index: 0, output: 0});
-    datas.push(Data {memory: &mut memory.clone(), memory_index: 0, input: vec![p[0]], input_index: 0, output: 0});
-    datas.push(Data {memory: &mut memory.clone(), memory_index: 0, input: vec![p[0]], input_index: 0, output: 0});
-    datas.push(Data {memory: &mut memory.clone(), memory_index: 0, input: vec![p[0]], input_index: 0, output: 0});
+        let mut amp_a = Data {memory: memory.clone(), memory_index: 0, input: vec![p[0], 0], input_index: 0, output: 0, input_channel: None, output_channel: None};
+        let mut amp_b = Data {memory: memory.clone(), memory_index: 0, input: vec![p[1]], input_index: 0, output: 0, input_channel: None, output_channel: None};
+        let mut amp_c = Data {memory: memory.clone(), memory_index: 0, input: vec![p[2]], input_index: 0, output: 0, input_channel: None, output_channel: None};
+        let mut amp_d = Data {memory: memory.clone(), memory_index: 0, input: vec![p[3]], input_index: 0, output: 0, input_channel: None, output_channel: None};
+        let mut amp_e = Data {memory: memory.clone(), memory_index: 0, input: vec![p[4]], input_index: 0, output: 0, input_channel: None, output_channel: None};
+        connect_amps(&mut amp_a, &mut amp_b);
+        connect_amps(&mut amp_b, &mut amp_c);
+        connect_amps(&mut amp_c, &mut amp_d);
+        connect_amps(&mut amp_d, &mut amp_e);
+        connect_amps(&mut amp_e, &mut amp_a);
+        let temp = p.clone();
+        let process_a = thread::spawn(move || {
+            run_data(&mut amp_a);
+            OutputSignal {phases: temp.clone(), signal: amp_a.output}
+        });
+        let temp = p.clone();
+        let process_b = thread::spawn(move || {
+            run_data(&mut amp_b);
+            OutputSignal {phases: temp.clone(), signal: amp_b.output}
+        });
+        let temp = p.clone();
+        let process_c = thread::spawn(move || {
+            run_data(&mut amp_c);
+            OutputSignal {phases: temp.clone(), signal: amp_c.output}
+        });
+        let temp = p.clone();
+        let process_d = thread::spawn(move || {
+            run_data(&mut amp_d);
+            OutputSignal {phases: temp.clone(), signal: amp_d.output}
+        });
+        let temp = p.clone();
+        let process_e = thread::spawn(move || {
+            run_data(&mut amp_e);
+            OutputSignal {phases: temp.clone(), signal: amp_e.output}
+        });
         let mut output = 0;
-        for amp in (0..5).cycle(){
-            datas[amp].input.push(output);
-            run_data(&mut datas[amp]);
-            output = datas[amp].output;
-        }
+        /*
+           for amp in (0..5).cycle(){
+           datas[amp].input.push(output);
+           run_data(&mut datas[amp]);
+           output = datas[amp].output;
+           }
+           */
         //results_2.push(OutputSignal {phases: p.clone(), signal: data.output});
+        results_2.push(process_a.join().unwrap());
+        results_2.push(process_b.join().unwrap());
+        results_2.push(process_c.join().unwrap());
+        results_2.push(process_d.join().unwrap());
+        results_2.push(process_e.join().unwrap());
     }
     let max = results_2.iter().fold(OutputSignal{phases: vec![], signal: 0}, |a, b| {if a.signal > b.signal {a} else {b.clone()}});
-    println!("{:?}", "filler");
-    */
+    println!("{:?}", max)
 }
 
 fn main() {
     //Read input and split by lines
-    let file_input = read_input("../7.1.txt");
+    let file_input = read_input("../7.txt");
     //Get the right data from the input
     let input: &str = match file_input.split_whitespace().next() {
         Some(s) => s,
