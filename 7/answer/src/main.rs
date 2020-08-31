@@ -179,7 +179,6 @@ fn run_data(data: &mut Data) -> usize {
         } else if instruction == '8'{
             equal(data, &mut index, positions);
         } else if instruction == '9' {
-            println!("result? {:?}", data.output);
             break
         } else{
             println!("error");
@@ -245,45 +244,24 @@ fn second_answer(memory: &Vec<i32>) -> (){
         connect_amps(&mut amp_c, &mut amp_d);
         connect_amps(&mut amp_d, &mut amp_e);
         connect_amps(&mut amp_e, &mut amp_a);
-        let temp = p.clone();
-        let process_a = thread::spawn(move || {
-            run_data(&mut amp_a);
-            OutputSignal {phases: temp.clone(), signal: amp_a.output}
-        });
-        let temp = p.clone();
-        let process_b = thread::spawn(move || {
-            run_data(&mut amp_b);
-            OutputSignal {phases: temp.clone(), signal: amp_b.output}
-        });
-        let temp = p.clone();
-        let process_c = thread::spawn(move || {
-            run_data(&mut amp_c);
-            OutputSignal {phases: temp.clone(), signal: amp_c.output}
-        });
-        let temp = p.clone();
-        let process_d = thread::spawn(move || {
-            run_data(&mut amp_d);
-            OutputSignal {phases: temp.clone(), signal: amp_d.output}
-        });
-        let temp = p.clone();
-        let process_e = thread::spawn(move || {
-            run_data(&mut amp_e);
-            OutputSignal {phases: temp.clone(), signal: amp_e.output}
-        });
         let mut output = 0;
-        /*
-           for amp in (0..5).cycle(){
-           datas[amp].input.push(output);
-           run_data(&mut datas[amp]);
-           output = datas[amp].output;
-           }
-           */
-        //results_2.push(OutputSignal {phases: p.clone(), signal: data.output});
-        results_2.push(process_a.join().unwrap());
-        results_2.push(process_b.join().unwrap());
-        results_2.push(process_c.join().unwrap());
-        results_2.push(process_d.join().unwrap());
-        results_2.push(process_e.join().unwrap());
+        let mut Datas: Vec<Data> = Vec::new();
+        Datas.push(amp_a);
+        Datas.push(amp_b);
+        Datas.push(amp_c);
+        Datas.push(amp_d);
+        Datas.push(amp_e);
+        let mut processes: Vec<std::thread::JoinHandle<OutputSignal>> = Vec::new();
+        for mut amp in Datas{
+            let temp = p.clone();
+            processes.push( thread::spawn(move || {
+                run_data(&mut amp);
+                OutputSignal {phases: temp, signal: amp.output}
+            }));
+        }
+        for p in processes {
+            results_2.push(p.join().unwrap());
+        }
     }
     let max = results_2.iter().fold(OutputSignal{phases: vec![], signal: 0}, |a, b| {if a.signal > b.signal {a} else {b.clone()}});
     println!("{:?}", max)
@@ -299,6 +277,6 @@ fn main() {
     };
     //println!(" The input is: {:?}", input);
     let memory: Vec<i32> = input.split(",").map(|x| x.parse::<i32>().unwrap()).collect();
-    first_answer(&memory);
+//    first_answer(&memory);
     second_answer(&memory);
 }
