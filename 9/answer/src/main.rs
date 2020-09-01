@@ -2,11 +2,10 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 // Used for Permutation
-use itertools::Itertools;
 // Nultithreading
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
-use std::thread;
+use std::collections::HashMap;
 
 
 #[derive(Debug)]
@@ -14,12 +13,13 @@ struct Data {
     // The 'a defines a lifetime
     intcode:  Vec<i64>,
     rip: usize,
-    relative_index: usize,
+    relative_index: i64,
     input: Vec<i64>,
     input_index: usize,
     output: i64,
     r#in: Option<Receiver<i64>>,
-    output_channel: Option<Sender<i64>>
+    output_channel: Option<Sender<i64>>,
+    mem_sup: HashMap<i64, i64>
 }
 
 #[derive(Debug)]
@@ -32,7 +32,6 @@ struct OutputSignal {
 trait To10ext {
     fn parse_decimal(&self) -> Vec<char>;
 }
-
 
 impl To10ext for i64 {
     fn parse_decimal(&self) -> Vec<char> {
@@ -52,42 +51,58 @@ fn new(intcode: Vec<i64>, input: Vec<i64>) -> Data {
         input: input,
         input_index: 0,
         output: 0,
+        mem_sup: HashMap::new(),
         r#in: None,
         output_channel: None
     }
 }
 
-fn deref(data: &mut Data, index: usize, positions_mode: char) -> i64 {
-    let address = Data::get_address(data, index, positions_mode);
-    if address > data.intcode.len() {
-        data.intcode.extend(vec![0; address - data.intcode.len() + 2])
+fn r#move(data: &mut Data, address: i64, value: i64) -> (){
+    if address >= data.intcode.len() as i64 {
+        let memory = data.mem_sup.entry(address).or_insert(value);
+        *memory = value;
+    } else {
+        //println!("{:?}", address);
+        data.intcode[address as usize] = value;
     }
-    data.intcode[address]
 }
 
-fn get_address(data: &mut Data, index: usize, positions_mode: char) -> usize {
-    match positions_mode {
-        '0' => data.intcode[index] as usize,
-        '1' => index,
-        '2' => { (data.relative_index as i64 + data.intcode[index]) as usize},
-         _  => 0
+fn deref(data: &mut Data, index: usize, positions_mode: char) -> i64 {
+    let address = Data::get_address(data, index, positions_mode) as i64;
+    if address >= data.intcode.len() as i64{
+    match data.mem_sup.get(&address) {
+            Some(value) => *value,
+            _ => {println!("merde"); 0}
+        }
+    } else {
+        data.intcode[address as usize]
     }
+}
+
+fn get_address(data: &mut Data, index: usize, positions_mode: char) -> i64 {
+    let address = match positions_mode {
+        '0' => data.intcode[index] as i64,
+        '1' => index as i64,
+        '2' => { (data.relative_index  + data.intcode[index])},
+         _  => {println!("address is incorect"); 0}
+    };
+    address
 }
 
 fn add(data: &mut Data, index: &mut usize,  positions: Vec<char> ) -> () {
-    let output = data.intcode[*index + 3] as usize;
+    let output_address = Data::get_address(data, *index + 3, positions[0]);
     let val2 = Data::deref(data, *index + 2, positions[1]);
     let val1 = Data::deref(data, *index + 1, positions[2]);
-    data.intcode[output] = val1 + val2;
+    Data::r#move(data, output_address, val1 + val2);
     *index += 4;
 }
 
-fn multiply(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->(){
+fn multiply(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->() {
     //  println!("instructions {:?} {:?} {:?}", data.intcode[index], index, positions);
-    let output = data.intcode[*index + 3] as usize;
+    let output_address = Data::get_address(data, *index + 3, positions[0]);
     let val2 = Data::deref(data, *index + 2, positions[1]);
     let val1 = Data::deref(data, *index + 1, positions[2]);
-    data.intcode[output] = val1 * val2;
+    Data::r#move(data, output_address, val1 * val2);
     *index += 4;
 }
 
@@ -121,45 +136,50 @@ fn jump_if_false(data: &mut Data, index: &mut usize,  positions: Vec<char>) -> (
 }
 
 
-fn less_than(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
+fn less_than(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->() {
 
-    let address = Data::get_address(data, *index + 3, positions[3]) as usize;
+    let address = Data::get_address(data, *index + 3, positions[0]);
     let val2 = Data::deref(data, *index + 2, positions[1]);
     let val1 = Data::deref(data, *index + 1, positions[2]);
-    data.intcode[address] = if val1 < val2 { 1 } else { 0 };
+    let result = if val1 < val2 { 1 } else { 0 };
+    Data::r#move(data, address, result);
     *index += 4;
 }
 
 
-fn equal(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
-    let address = Data::get_address(data, *index + 3, positions[3]) as usize;
+fn equal(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->() {
+    let address = Data::get_address(data, *index + 3, positions[0]);
     let val2 = Data::deref(data, *index + 2, positions[1]);
     let val1 = Data::deref(data, *index + 1, positions[2]);
-    data.intcode[address] = if val1 == val2 { 1 } else { 0 };
+    let result = if val1 == val2 { 1 } else { 0 };
+    Data::r#move(data, address, result);
     *index += 4;
 }
 
 
-fn _nothing(_data: &mut Data, _index: &mut usize,  _positions: Vec<char> ) ->(){
+fn _nothing(_data: &mut Data, _index: &mut usize,  _positions: Vec<char> ) ->() {
 }
 
 
-fn store(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->(){
+fn store(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->() {
     if data.input.len() <= data.input_index {
         let input = &data.r#in;
         match input{
-            Some(rx) => { data.input.push(rx.recv().unwrap())},
-            _ => return
+            Some(rx) => { println!("store"); data.input.push(rx.recv().unwrap())},
+            _ => { println!("missing input"); return }
         }
     }
     let address = Data::get_address(data, *index + 1, positions[2]);
-    data.intcode[address] = data.input[data.input_index];
+    //println!("address store {:?}", address);
+    Data::r#move(data, address, data.input[data.input_index]);
+    //println!("input {:?}", data.relative_index);
     data.input_index += 1;
     *index += 2;
 }
 
 fn stack_change(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
-    data.relative_index += Data::get_address(data, *index + 1, positions[2]);
+    data.relative_index += Data::deref(data, *index + 1, positions[2]);
+   // println!("pointeur stacks{:?}", data.relative_index);
     *index += 2;
 }
 
@@ -170,6 +190,7 @@ fn run_data(data: &mut Data) -> usize {
     while index < len {
 
         let instructions = data.intcode[index].parse_decimal(); 
+        println!("{:?} {:?}", index, instructions);
         match instructions.as_slice() {
             [_, _, _, _, '1'] => Data::add(data, &mut index, instructions),
             [_, _, _, _, '2'] => Data::multiply(data, &mut index, instructions),
@@ -196,18 +217,16 @@ fn connect_amps(input_amp: &mut Data, output_amp: &mut Data) -> () {
 }
 
 fn first_answer(intcode: &Vec<i64>) -> (){
-      let mut results_1: Vec<OutputSignal> = Vec::new();
       //try all permutations
           let mut data = Data::new(intcode.clone(), vec![1]);
           data.input_index = 0;
           Data::run_data(&mut data);
-      println!("First answer [phase, value]{:?}", data.output);
   }
 
 
 fn main() {
     //Read input and split by lines
-    let file_input = read_input("../9.2.txt");
+    let file_input = read_input("../9.txt");
     //Get the right data from the input
     let input: &str = match file_input.split_whitespace().next() {
         Some(s) => s,
@@ -219,7 +238,6 @@ fn main() {
 }
 
 fn read_input(file_location: &str) -> std::string::String {
-    //  let path = Path::new("../4.test0.txt"); //test file
     let path = Path::new(file_location);
     let display = path.display();
 
