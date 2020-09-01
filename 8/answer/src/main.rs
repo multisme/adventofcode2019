@@ -4,35 +4,25 @@ use std::path::Path;
 use std::str::from_utf8;
 use std::iter::{self, Sum};
 
-#[derive(Debug)]
-#[derive(Clone)]
-struct Layer{
-    pixels: String
-}
-
-#[derive(Debug)]
-struct Image{
-    height: usize,
-    width: usize,
-    layers: Vec<Layer>
-}
-
 
 fn read_input(file_location: &str) -> std::string::String {
-    //  let path = Path::new("../4.test0.txt"); //test file
     let path = Path::new(file_location);
-    let display = path.display();
 
     let mut file = match File::open(&path) {
-        Err(why) => panic!("couldn't open the file {}: {}", display, why.to_string()),
+        Err(why) => panic!("couldn't open the file {}: {}", path.display(), why.to_string()),
         Ok(file) => file,
     };  
     let mut s = String::new();
     match file.read_to_string(&mut s) {
-        Err(why) => panic!("couldn't read {}:  {}", display, why.to_string()),
+        Err(why) => panic!("couldn't read {}:  {}", path.display(), why.to_string()),
         Ok(_) => (), 
     };
     s   
+}
+
+#[derive(Clone)]
+struct Layer{
+    pixels: String
 }
 
 impl Layer{
@@ -48,6 +38,22 @@ impl Layer{
             .collect();
             Layer{pixels: new_pixels}
     }
+
+    fn print_layer(&self, width: usize) -> (){
+        self.pixels.replace("0", " ") .as_bytes()
+            .chunks(width)
+            .for_each(
+                |chunk| println!("{:?}", from_utf8(chunk).unwrap()
+                                                    .to_string()
+                                                    .replace("0", " ")
+                )
+            );
+    }
+}
+
+struct Image{
+    width: usize,
+    layers: Vec<Layer>
 }
 
 impl Image{
@@ -57,17 +63,8 @@ impl Image{
             .chunks(pixels_number)
             .map(|chunk| Layer { pixels: from_utf8(chunk).unwrap().to_string()})
             .collect::<Vec<Layer>>();
-        Image {height: height, width: width, layers: layers}
+        Image {width: width, layers: layers}
     } 
-
-    fn print_layer(&self, layer: &Layer) -> (){
-        layer.pixels.as_bytes()
-            .chunks(self.width)
-            .for_each(|chunk| println!("{:?}", from_utf8(chunk).unwrap()
-                                                    .to_string()
-                                                    .replace("0", " "))
-            );
-    }
 }
 
 
@@ -93,5 +90,5 @@ fn main() {
     let result = first_answer(&image);
     let result2 = second_answer(&image);
     println!("{:?}", result);
-    image.print_layer(&result2);
+    result2.print_layer(image.width);
 }

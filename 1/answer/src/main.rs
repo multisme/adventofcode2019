@@ -39,6 +39,6 @@ fn main() {
 
     // Second answer
 
-    let mut res2: i32 = split.iter().map(|x| additionnal_fuel(*x)).sum();
+    let res2: i32 = split.iter().map(|x| additionnal_fuel(*x)).sum();
     println!("result: answer 1 {} answer 2 {}", res, res2);
 }
