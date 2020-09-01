@@ -12,21 +12,21 @@ use std::thread;
 #[derive(Debug)]
 struct Data {
     // The 'a defines a lifetime
-    intcode:  Vec<i32>,
+    intcode:  Vec<i64>,
     rip: usize,
     relative_index: usize,
-    input: Vec<i32>,
+    input: Vec<i64>,
     input_index: usize,
-    output: i32,
-    r#in: Option<Receiver<i32>>,
-    output_channel: Option<Sender<i32>>
+    output: i64,
+    r#in: Option<Receiver<i64>>,
+    output_channel: Option<Sender<i64>>
 }
 
 #[derive(Debug)]
 #[derive(Clone)]
 struct OutputSignal {
-    phases: Vec<i32>,
-    signal: i32
+    phases: Vec<i64>,
+    signal: i64
 }
 
 trait To10ext {
@@ -34,7 +34,7 @@ trait To10ext {
 }
 
 
-impl To10ext for i32 {
+impl To10ext for i64 {
     fn parse_decimal(&self) -> Vec<char> {
         let result: Vec<char> = (self + 100000).to_string() // add 10 000 to be sure to catch the empty zeros before the int
             .chars()
@@ -44,7 +44,7 @@ impl To10ext for i32 {
 }
 
 impl Data {
-fn new(intcode: Vec<i32>, input: Vec<i32>) -> Data {
+fn new(intcode: Vec<i64>, input: Vec<i64>) -> Data {
     Data {
         intcode: intcode,
         rip : 0,
@@ -57,21 +57,19 @@ fn new(intcode: Vec<i32>, input: Vec<i32>) -> Data {
     }
 }
 
-fn deref(data: &mut Data, index: usize, positions_mode: char) -> i32 {
-    let address = match positions_mode {
-        '0' => data.intcode[index],
-        '1' => index as i32,
-        '2' => { println!("2"); data.relative_index as i32 + data.intcode[index]},
-         _  => 0
-    };
-    data.intcode[address as usize]
+fn deref(data: &mut Data, index: usize, positions_mode: char) -> i64 {
+    let address = Data::get_address(data, index, positions_mode);
+    if address > data.intcode.len() {
+        data.intcode.extend(vec![0; address - data.intcode.len() + 2])
+    }
+    data.intcode[address]
 }
 
 fn get_address(data: &mut Data, index: usize, positions_mode: char) -> usize {
     match positions_mode {
         '0' => data.intcode[index] as usize,
         '1' => index,
-        '2' => { println!("2"); data.relative_index + data.intcode[index] as usize},
+        '2' => { (data.relative_index as i64 + data.intcode[index]) as usize},
          _  => 0
     }
 }
@@ -80,7 +78,7 @@ fn add(data: &mut Data, index: &mut usize,  positions: Vec<char> ) -> () {
     let output = data.intcode[*index + 3] as usize;
     let val2 = Data::deref(data, *index + 2, positions[1]);
     let val1 = Data::deref(data, *index + 1, positions[2]);
-    data.intcode[output as usize] = val1 + val2;
+    data.intcode[output] = val1 + val2;
     *index += 4;
 }
 
@@ -89,7 +87,7 @@ fn multiply(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->(){
     let output = data.intcode[*index + 3] as usize;
     let val2 = Data::deref(data, *index + 2, positions[1]);
     let val1 = Data::deref(data, *index + 1, positions[2]);
-    data.intcode[output as usize] = val1 * val2;
+    data.intcode[output] = val1 * val2;
     *index += 4;
 }
 
@@ -97,6 +95,7 @@ fn multiply(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->(){
 fn display(data: &mut Data, index: &mut usize,  positions: Vec<char>) -> () {
     data.output = Data::deref(data, *index + 1, positions[2]);
     let ouput_entry = &data.output_channel;
+    println!("{:?}", data.output);
     *index += 2;
     match ouput_entry {
         Some(rx) => { rx.send(data.output).unwrap(); }
@@ -124,7 +123,7 @@ fn jump_if_false(data: &mut Data, index: &mut usize,  positions: Vec<char>) -> (
 
 fn less_than(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
 
-    let address = Data::deref(data, *index + 3, positions[3]) as usize;
+    let address = Data::get_address(data, *index + 3, positions[3]) as usize;
     let val2 = Data::deref(data, *index + 2, positions[1]);
     let val1 = Data::deref(data, *index + 1, positions[2]);
     data.intcode[address] = if val1 < val2 { 1 } else { 0 };
@@ -133,7 +132,7 @@ fn less_than(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
 
 
 fn equal(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
-    let address = Data::deref(data, *index + 3, positions[3]) as usize;
+    let address = Data::get_address(data, *index + 3, positions[3]) as usize;
     let val2 = Data::deref(data, *index + 2, positions[1]);
     let val1 = Data::deref(data, *index + 1, positions[2]);
     data.intcode[address] = if val1 == val2 { 1 } else { 0 };
@@ -159,6 +158,10 @@ fn store(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->(){
     *index += 2;
 }
 
+fn stack_change(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
+    data.relative_index += Data::get_address(data, *index + 1, positions[2]);
+    *index += 2;
+}
 
 fn run_data(data: &mut Data) -> usize {
     let mut index: usize = data.rip;
@@ -176,8 +179,9 @@ fn run_data(data: &mut Data) -> usize {
             [_, _, _, _, '6'] => Data::jump_if_false(data, &mut index, instructions),
             [_, _, _, _, '7'] => Data::less_than(data, &mut index, instructions),
             [_, _, _, _, '8'] => Data::equal(data, &mut index, instructions),
+            [_, _, _, '0', '9'] => Data::stack_change(data, &mut index, instructions),
             [_, _, _, '9', '9'] => { break },
-            _ => { println!("error"); break }
+            _ => { println!("error {:?}, {:?}", instructions, index); break }
         }
     }
     index
@@ -185,38 +189,31 @@ fn run_data(data: &mut Data) -> usize {
 
 
 fn connect_amps(input_amp: &mut Data, output_amp: &mut Data) -> () {
-    let (tx, rx): (Sender<i32>, Receiver<i32>) = mpsc::channel();
+    let (tx, rx): (Sender<i64>, Receiver<i64>) = mpsc::channel();
     output_amp.output_channel = Some(tx);
     input_amp.r#in = Some(rx);
 }
 }
 
-fn first_answer(intcode: &Vec<i32>) -> (){
+fn first_answer(intcode: &Vec<i64>) -> (){
       let mut results_1: Vec<OutputSignal> = Vec::new();
       //try all permutations
-      for p in  (0..5).permutations(5){
-          let mut data = Data::new(intcode.clone(), vec![]);
-          for phase in &p {
-              data.input_index = 0;
-              data.input = vec![*phase, data.output];
-              Data::run_data(&mut data);
-          }
-          results_1.push(OutputSignal {phases: p.clone(), signal: data.output});
-      }
-      let max = results_1.iter().fold(OutputSignal{phases: vec![], signal: 0}, |a, b| {if a.signal > b.signal {a} else   {b.clone()}});
-      println!("First answer [phase, value]{:?}", max);
+          let mut data = Data::new(intcode.clone(), vec![1]);
+          data.input_index = 0;
+          Data::run_data(&mut data);
+      println!("First answer [phase, value]{:?}", data.output);
   }
 
 
 fn main() {
     //Read input and split by lines
-    let file_input = read_input("../9.txt");
+    let file_input = read_input("../9.2.txt");
     //Get the right data from the input
     let input: &str = match file_input.split_whitespace().next() {
         Some(s) => s,
         None => ""
     };
-    let intcode: Vec<i32> = input.split(",").map(|x| x.parse::<i32>().unwrap()).collect();
+    let intcode: Vec<i64> = input.split(",").map(|x| x.parse::<i64>().unwrap()).collect();
     first_answer(&intcode)
     //println!(" The input is: {:?}", input);
 }
