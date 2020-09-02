@@ -190,7 +190,7 @@ fn run_data(data: &mut Data) -> usize {
     while index < len {
 
         let instructions = data.intcode[index].parse_decimal(); 
-        println!("{:?} {:?}", index, instructions);
+        //println!("{:?} {:?}", index, instructions); // Debug
         match instructions.as_slice() {
             [_, _, _, _, '1'] => Data::add(data, &mut index, instructions),
             [_, _, _, _, '2'] => Data::multiply(data, &mut index, instructions),
@@ -221,7 +221,15 @@ fn first_answer(intcode: &Vec<i64>) -> (){
           let mut data = Data::new(intcode.clone(), vec![1]);
           data.input_index = 0;
           Data::run_data(&mut data);
-  }
+}
+
+fn second_answer(intcode: &Vec<i64>) -> (){
+      //try all permutations
+          let mut data = Data::new(intcode.clone(), vec![2]);
+          data.input_index = 0;
+          Data::run_data(&mut data);
+}
+
 
 
 fn main() {
@@ -233,7 +241,8 @@ fn main() {
         None => ""
     };
     let intcode: Vec<i64> = input.split(",").map(|x| x.parse::<i64>().unwrap()).collect();
-    first_answer(&intcode)
+    first_answer(&intcode);
+    second_answer(&intcode);
     //println!(" The input is: {:?}", input);
 }
 
