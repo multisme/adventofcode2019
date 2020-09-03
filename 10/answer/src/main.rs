@@ -2,15 +2,32 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
-enum Case {
-    Asteroid,
-    EmptySpace
+
+#[derive(Debug)]
+#[derive(Clone)]
+struct asteroid{
+    x: i32,
+    y: i32,
+    hit: usize
 }
 
 #[derive(Debug)]
 #[derive(Clone)]
 struct AstroMap{
-    coords: Vec<(i32, i32)>,
+    coords: Vec<asteroid>,
+}
+
+
+impl PartialEq for asteroid{
+    fn eq(&self, other: &Self) -> bool {
+        self.x == other.x && self.y == other.y
+    }
+}
+
+impl asteroid{
+    fn update_count(&mut self, count: usize){
+        self.hit  = count; 
+    }
 }
 
 impl AstroMap {
@@ -19,47 +36,61 @@ impl AstroMap {
             coords: Vec::new(),
         }
     }
-    
-    fn relative_map(&self, coord: (i32, i32)) -> AstroMap {
+
+    fn relative_map(&self, coord: &asteroid) -> AstroMap {
         let mut relative_map = AstroMap::new();
         for asteroid in &self.coords {
-            if *asteroid != coord{
-                relative_map.coords.push((asteroid.0 - coord.0, asteroid.1 - coord.1));
+            if asteroid != coord{
+                relative_map.coords.push(asteroid{x: asteroid.x - coord.x, y: asteroid.y - coord.y, hit: 0});
             }
         }
-       //println!("{:?}", relative_map.coords);
+        //println!("{:?}", relative_map.coords);
         relative_map
     }
 
-    fn find_hidden_asteroids(&mut self) -> &AstroMap {
-        self.coords = self.coords.iter()
-            .filter(|&x| hidden(x, self.coords.clone()))
-            .map(|x| *x)
-            .collect();
-        //println!("{:?}", self);
-        self
+    fn find_hidden_asteroids(&mut self) -> Vec<&asteroid> {
+        self.coords.iter()
+            .filter(|&x| hidden(x, &self.coords))
+            .map(|x| x)
+            .collect()
     }
 
-    fn visible_asteroids(&self, coord: (i32, i32)) -> usize {
+    fn removed_asteroid(&mut self) -> Vec<&asteroid> {
+        let size = self.coords.len();
+        let mut removed: Vec<&asteroid> = Vec::new();
+        let mut count: usize = 1;
+
+        for asteroid in &mut self.coords.iter(){
+            if !hidden(asteroid, &self.coords){
+                removed.push(&asteroid);
+                //println!("{:?}", asteroid);
+                count +=1;
+            }
+            if count >= size{
+                break
+            }
+        }
+        removed 
+    }
+
+    fn visible_asteroids(&self, coord: &asteroid) -> usize {
         let hiddens_one = self.relative_map(coord)
             .find_hidden_asteroids()
-            .coords.len();
-        //println!("{:?} {:?} {:?}", self.coords.len(), hiddens_one + 1, coord);
+            .len();
+        // Number of asteroides - hidden_ones from the current asteroid - the one i am on
         return self.coords.len() - hiddens_one - 1
     }
 }
 
-fn hidden(asteroid: &(i32, i32), asteroids: Vec<(i32, i32)>) -> bool {
-     for object in asteroids{
-        if *asteroid == object {
-            return false
-        }
-        if asteroid.1 * object.0 - object.1 * asteroid.0 == 0{
-                //println!("colinear {:?} {:?}", asteroid, object);
-            if asteroid.0 * object.0 > 0 || asteroid.1 * object.1 > 0{
-                if asteroid.0 > object.0 || asteroid.1 > object.1 {
-                   // println!("i chosen colinear {:?} {:?}", asteroid, object);
-                    return true
+
+fn hidden(asteroid: &asteroid, asteroids: &Vec<asteroid>) -> bool {
+    for object in asteroids{
+        if asteroid != object {
+            if asteroid.y * object.x - object.y * asteroid.x == 0{
+                if asteroid.x * object.x > 0 || asteroid.y * object.y > 0{
+                    if asteroid.x.abs() > object.x.abs() || asteroid.y.abs() > object.y.abs() {
+                        return true
+                    }
                 }
             }
         }
@@ -67,37 +98,55 @@ fn hidden(asteroid: &(i32, i32), asteroids: Vec<(i32, i32)>) -> bool {
     return false
 }
 
-fn first_answer(map: &AstroMap) -> (usize, (i32, i32)){
-    let mut line_of_sights: Vec<(usize, (i32, i32))> = Vec::new();
+/*
+   impl Ord for (usize, asteroid){
+   ²    fn cmp(&self, other: &(usize, asteroid)){
+   self.0.cmp(other.0)
+   }
+   }
+   */
+
+fn first_answer(map: &AstroMap) -> (usize, asteroid){
+    let mut line_of_sights: Vec<(usize, asteroid)> = Vec::new();
 
     
-    for asteroid in map.coords.clone(){
-        let number_seen = map.visible_asteroids(asteroid);
-        line_of_sights.push((number_seen, asteroid));
-    }
-    
-    let number_seen = map.visible_asteroids((8,5));
-    println!("{:?}", number_seen);
-   // (number_seen, (5,8))
-   *line_of_sights.iter().max().unwrap()
+       for asteroid in map.coords.clone(){
+       let number_seen = map.visible_asteroids(&asteroid);
+       line_of_sights.push((number_seen, asteroid.clone()));
+       }
+       
+    let number_seen = map.visible_asteroids(&asteroid{x: 11, y: 13, hit: 0});
+    let start = asteroid{x: 0, y: 0, hit: 0};
+    line_of_sights.iter().fold((0, start), |acc, x| if acc.0 > x.0 {acc} else {x.clone()})
+}
+
+fn second_answer(map: &mut AstroMap) -> u32 {
+    let start = asteroid{x: 5, y: 8, hit: 0 };
+    let mut map = map.relative_map(&start);
+    let removed = map.removed_asteroid();
+    //println!("{:?}", removed);
+    //((removed[199].x + 37) * 100) as u32 + (removed[199].y + 25) as u32
+    //
+    0
 }
 
 fn main() {
     let file_input = read_input("../10.txt");
     //Get the right data from the input
     let mut map = AstroMap::new();
-    
+
     for (index, line) in file_input.split_whitespace().enumerate() {
         let y = index;
         let new_coords = line.chars()
             .enumerate()
             .filter(|s| s.1 == '#')
-            .map(|(i, _)| (y as i32, i as i32));
-            //.collect::<Vec<(i32, i32)>>();
+            .map(|(i, _)| asteroid{x: i as i32, y: y as i32, hit: 0});
+        //.collect::<Vec<asteroid>>();
         map.coords.extend(new_coords);
     }
-    let result = first_answer(&map);
-    println!("{:?}", result);
+    let result1 = first_answer(&map);
+    let result2 = 0;//second_answer(&mut map);
+    println!("{:?} {:?}", result1, result2);
 }
 
 fn read_input(file_location: &str) -> std::string::String {
@@ -115,5 +164,3 @@ fn read_input(file_location: &str) -> std::string::String {
     };
     s   
 }
-
-
