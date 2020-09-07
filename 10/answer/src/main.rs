@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
+use std::cmp::Ordering;
 
 
 #[derive(Debug)]
@@ -28,6 +29,53 @@ impl asteroid{
     fn update_count(&mut self, count: usize){
         self.hit  = count; 
     }
+
+    fn cmp_asteroid(&self, other: &asteroid) -> Ordering {
+        if self.hit != other.hit{
+            return self.hit.cmp(&other.hit)
+        } else {
+            let origin = asteroid {x: 0, y:0, hit: 0};
+            return origin.compare_angle(self).cmp(&origin.compare_angle(other));
+        }
+    }
+
+    // function that count how much of asteroids hid the present one
+    fn count_concealers(&mut self, asteroids: &Vec<asteroid>) -> () {
+        for object in asteroids{
+            if self != object {
+                if self.y * object.x - object.y * self.x == 0{
+                    if self.x * object.x > 0 || self.y * object.y > 0 {
+                        if self.x.abs() > object.x.abs() || self.y.abs() > object.y.abs() {
+                            self.hit += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn compare_angle(&self, coord: &asteroid) -> Ordering {
+        
+        if self.x * coord.x < 0 {
+            return self.x.cmp(&coord.x);
+        } else if self.x == 0 && coord.x == 0 {
+            if self.y > 0 && coord.y < 0{
+                return Ordering::Greater;
+            } else {
+                return Ordering::Less;
+            }
+        } else {
+            let cross_product =  self.y * coord.x - self.x * coord.y; 
+            if cross_product > 0 {
+                return Ordering::Greater
+            } else if cross_product == 0 {
+                return Ordering::Equal
+            } else {
+                return Ordering::Less
+            }
+        }
+    }
+
 }
 
 impl AstroMap {
@@ -37,6 +85,7 @@ impl AstroMap {
         }
     }
 
+    // Function that return a cartesian map where the center is the given asteroid (coord) 
     fn relative_map(&self, coord: &asteroid) -> AstroMap {
         let mut relative_map = AstroMap::new();
         for asteroid in &self.coords {
@@ -44,10 +93,12 @@ impl AstroMap {
                 relative_map.coords.push(asteroid{x: asteroid.x - coord.x, y: asteroid.y - coord.y, hit: 0});
             }
         }
-        //println!("{:?}", relative_map.coords);
+        //pSuivrintln!("{:?}", relative_map.coords);
         relative_map
     }
 
+
+    // Function that return all the asteroid that are not hidden
     fn find_hidden_asteroids(&mut self) -> Vec<&asteroid> {
         self.coords.iter()
             .filter(|&x| hidden(x, &self.coords))
@@ -55,24 +106,22 @@ impl AstroMap {
             .collect()
     }
 
-    fn removed_asteroid(&mut self) -> Vec<&asteroid> {
-        let size = self.coords.len();
-        let mut removed: Vec<&asteroid> = Vec::new();
-        let mut count: usize = 1;
 
-        for asteroid in &mut self.coords.iter(){
-            if !hidden(asteroid, &self.coords){
-                removed.push(&asteroid);
-                //println!("{:?}", asteroid);
-                count +=1;
-            }
-            if count >= size{
-                break
-            }
+    // Function that order asteroid by quadrant (360). The one is the backs get hit later
+    fn order_asteroid(&mut self) -> Vec<asteroid> {
+        let size = self.coords.len();
+        let mut removed: Vec<asteroid> = Vec::new();
+
+        let mut asteroid_left: Vec<asteroid> = self.coords.clone();
+        let mut not_hit: Vec<asteroid> = Vec::new();
+        for asteroid in asteroid_left.iter_mut(){
+            asteroid.count_concealers(&self.coords);
         }
-        removed 
+        asteroid_left.sort_by(|a, b| a.cmp_asteroid(b));
+        asteroid_left
     }
 
+    // Function that return the number of seen asteroids from a given one:
     fn visible_asteroids(&self, coord: &asteroid) -> usize {
         let hiddens_one = self.relative_map(coord)
             .find_hidden_asteroids()
@@ -82,7 +131,7 @@ impl AstroMap {
     }
 }
 
-
+// function that check if an asteroid is hidden
 fn hidden(asteroid: &asteroid, asteroids: &Vec<asteroid>) -> bool {
     for object in asteroids{
         if asteroid != object {
@@ -98,40 +147,35 @@ fn hidden(asteroid: &asteroid, asteroids: &Vec<asteroid>) -> bool {
     return false
 }
 
-/*
-   impl Ord for (usize, asteroid){
-   ²    fn cmp(&self, other: &(usize, asteroid)){
-   self.0.cmp(other.0)
-   }
-   }
-   */
 
-fn first_answer(map: &AstroMap) -> (usize, asteroid){
-    let mut line_of_sights: Vec<(usize, asteroid)> = Vec::new();
+fn first_answer(map: &AstroMap) -> (usize, &asteroid){
+    let mut line_of_sights: Vec<(usize, &asteroid)> = Vec::new();
 
-    
-       for asteroid in map.coords.clone(){
-       let number_seen = map.visible_asteroids(&asteroid);
-       line_of_sights.push((number_seen, asteroid.clone()));
-       }
-       
-    let number_seen = map.visible_asteroids(&asteroid{x: 11, y: 13, hit: 0});
+
+    for asteroid in &map.coords{
+        let number_seen = map.visible_asteroids(&asteroid);
+        line_of_sights.push((number_seen, &asteroid));
+    }
+
     let start = asteroid{x: 0, y: 0, hit: 0};
-    line_of_sights.iter().fold((0, start), |acc, x| if acc.0 > x.0 {acc} else {x.clone()})
+    *line_of_sights.iter().max_by_key(|x| x.0).unwrap()
 }
 
-fn second_answer(map: &mut AstroMap) -> u32 {
-    let start = asteroid{x: 5, y: 8, hit: 0 };
+fn second_answer(map: &mut AstroMap, start: &asteroid) -> u32 {
     let mut map = map.relative_map(&start);
-    let removed = map.removed_asteroid();
-    //println!("{:?}", removed);
-    //((removed[199].x + 37) * 100) as u32 + (removed[199].y + 25) as u32
-    //
-    0
+    let ordered = map.order_asteroid();
+  //  println!(" ordered {:?}", (ordered[199].x + start.x, ordered[199].y + start.y));
+    for o in &ordered{
+       println!(" ordered {:?}", asteroid{x:o.x, y: o.y, hit: o.hit});
+     //   println!(" ordered {:?}", asteroid{x:o.x + start.x, y: o.y + start.y, hit: o.hit});
+    }
+    //((ordered[199].x + start.x) * 100) as u32 + (ordered[199].y + start.y) as u32
+     0
 }
+
 
 fn main() {
-    let file_input = read_input("../10.txt");
+    let file_input = read_input("../10.4.txt");
     //Get the right data from the input
     let mut map = AstroMap::new();
 
@@ -141,13 +185,14 @@ fn main() {
             .enumerate()
             .filter(|s| s.1 == '#')
             .map(|(i, _)| asteroid{x: i as i32, y: y as i32, hit: 0});
-        //.collect::<Vec<asteroid>>();
         map.coords.extend(new_coords);
     }
     let result1 = first_answer(&map);
-    let result2 = 0;//second_answer(&mut map);
+    //let result2 = second_answer(&mut map, &result1.1);
+    let result2 = 0;
     println!("{:?} {:?}", result1, result2);
 }
+
 
 fn read_input(file_location: &str) -> std::string::String {
     let path = Path::new(file_location);
