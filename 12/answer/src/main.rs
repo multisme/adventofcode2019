@@ -49,9 +49,9 @@ impl Moon{
     }
 
 }
-    fn compare(first: &Vec<Moon>, other: &Vec<Moon>) -> bool{
-       for (a, b) in first.iter().zip(other){
-           if a != b {
+    fn compare_partial(first: &Vec<Moon>, other: &Vec<Moon>, index: usize) -> bool{
+        for (a, b) in first.iter().zip(other){
+           if a.pos[index] != b.pos[index] {
                return false
            }
        }
@@ -84,8 +84,9 @@ fn first_answer(orbits: &mut Vec<Moon>) -> u32{
 
 
 fn second_answer(orbits: &mut Vec<Moon>) -> u32{
-    let mut n = 0;
     let start = orbits.clone();
+    let (mut n, mut count) = (0, 0);
+    let mut cycles = vec![0; 3];
 
     loop {
         let new_orbits = orbits.clone();
@@ -93,19 +94,27 @@ fn second_answer(orbits: &mut Vec<Moon>) -> u32{
             moon.apply_gravity(&new_orbits);
             moon.apply_velocity();
         }
-        if compare(&start, &orbits){
-           // println!("{:?}", start);
-           // println!("{:?}", orbits);
-            break
+        for i in 0..3{
+            if compare_partial(&start, &new_orbits, i) && cycles[i] == 0{
+                cycles[i] = n;
+                println!("{:?} {:?} {:?}", cycles, i, n);
+                for (a, b) in start.iter().zip(&new_orbits){
+                    println!("{:?} {:?}", a, b);
+                }
+                count += 1;
+            }
         }
         n += 1;
+        if n > 1 && start == new_orbits {
+                break;
+        }
     }
-    println!("{}", n);
+    println!("{:?} {:?}", cycles, n);
     n
 }
 
 fn main() {
-    let fileinput = read_file::read_input("../12.txt");
+    let fileinput = read_file::read_input("../12.1.txt");
     let mut orbits = fileinput.lines().map(|x| Moon::new(x)).collect::<Vec<Moon>>();
     first_answer(&mut orbits.clone());
     second_answer(&mut orbits.clone());
