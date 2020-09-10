@@ -107,48 +107,92 @@ impl Robot {
     }
 }
 
-fn first_answer(intcode: Vec<i64>) -> usize {
-    let mut data = intcode::Data::new(intcode, vec![0]);
+impl Move {
+    fn compute_move(m: i64) -> Move{
+        match m {
+            0 => Move::Left,
+            1 => Move::Right,
+            _ => panic!("move not existing")
+        }
+    }
+}
+
+fn paint(automat: &mut Robot, intcode: &Vec<i64>, input: Vec<i64>) -> (){
+    let mut paint = true;
+    let mut color_to_paint = Color::Black;
+    let mut data = intcode::Data::new(intcode.clone(), input);
     let rx = data.get_input_channel();
     let tx = data.get_output_channel();
+
+    // Run the intcode
     let  code = thread::spawn(move || {
         intcode::Data::run_data(&mut data)
     });
-    let mut paint = true;
-    let mut color_to_paint = Color::Black;
-    let mut automat = Robot::new();
 
+    // Get the result of the intcode and process it as either a move or a painting action
     for p in tx.iter(){
-       // println!("{:?}", p);
         if paint == false {
-           let m =  match p {
-               0 => Move::Left,
-               1 => Move::Right,
-               _ => return 0
-            };
-         //  println!(" move {:?}", m);
-          // println!("detected color {:?}", automat.detect_color());
+            let m = Move::compute_move(p);
             automat.apply_move(m, color_to_paint);
             rx.send(automat.detect_color() as i64).unwrap();
         } else {
-          // println!("color_to_paint {:?}", automat.detect_color());
             color_to_paint = Color::compute_color(p);
         }
         paint =!paint
     }
     code.join().unwrap();
-    automat.path.len()
 }
 
-fn main() {
-    let file_input = read_file::read_input("../11.txt");
-    let input = match file_input.split_whitespace().next(){
-        Some(s) =>s,
-        None => ""
-    };
-    let intcode: Vec<i64> = input.split(",")
-        .map(|x| x.parse::<i64>().unwrap())
-        .collect();
-    let result = first_answer(intcode);
+fn first_answer(intcode: &Vec<i64>) -> usize {
+    let mut automat = Robot::new();
+    paint(&mut automat, &intcode, vec![0]);
+    let result = automat.path.len();
     println!("{:?}", result);
+    result
 }
+
+
+fn second_answer(intcode: &Vec<i64>) -> () {
+    let mut automat = Robot::new();
+    paint(&mut automat, &intcode, vec![1]);
+
+
+    let len = automat.path.len() as i64 ;
+    let mut result = String::new();
+    let xs = &automat.path.iter().map(|x| x.0.x);
+    let (startx, endx) = (xs.clone().min().unwrap(), xs.clone().max().unwrap());
+    let ys = &automat.path.iter().map(|y| y.0.y);
+    let (starty, endy) = (ys.clone().min().unwrap(), ys.clone().max().unwrap());
+    let (mut i, mut j) = (startx  - 1, starty - 1);
+
+while i < endx + 1{
+    while j < endy + 1{
+            match automat.path.get(&Coord{x: i, y: j, orientation: Orientation::North}){
+                 Some(x) => match x {
+                     Color::Black => result.push(' '),
+                     Color::White => result.push('x')
+                 },
+                    _ => result.push(' ')
+                 }
+            j += 1;
+        }
+        result.push('\n');
+        j = starty - 1;
+        i += 1;
+    }
+    println!("{}", result);
+}
+
+
+    fn main() {
+        let file_input = read_file::read_input("../11.txt");
+        let input = match file_input.split_whitespace().next(){
+            Some(s) =>s,
+            None => ""
+        };
+        let intcode: Vec<i64> = input.split(",")
+            .map(|x| x.parse::<i64>().unwrap())
+            .collect();
+        first_answer(&intcode);
+        second_answer(&intcode);
+    }
