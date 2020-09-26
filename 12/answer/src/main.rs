@@ -1,9 +1,17 @@
+use std::sync::mpsc::{Sender, Receiver};
+use std::collections::HashMap;
+use std::sync::mpsc;
 mod  read_file;
 
 #[derive(Clone, Debug, Eq)]
 struct Moon{
     pos: Vec<i32>,
     velocity: Vec<i32>
+}
+
+struct Cyclicity{
+    cycle: i64,
+    index: usize,
 }
 
 impl Moon{
@@ -23,17 +31,15 @@ impl Moon{
     fn apply_gravity(&mut self, other_moon: &Vec<Moon>){
         for moon in other_moon{
             if *moon != *self{
-            for i in 0..3{
-                if self.pos[i] < moon.pos[i]{
-                    self.velocity[i] += 1;
-                } else if self.pos[i] > moon.pos[i]{
-                    self.velocity[i] -= 1;
+                for i in 0..3{
+                    if self.pos[i] < moon.pos[i]{
+                        self.velocity[i] += 1;
+                    } else if self.pos[i] > moon.pos[i]{
+                        self.velocity[i] -= 1;
+                    }
                 }
             }
-   //     println!("{:?} {:?}", self, moon);
-            }
         }
-        //println!("\n{:?}", self);
     }
 
     fn apply_velocity(&mut self){
@@ -49,14 +55,17 @@ impl Moon{
     }
 
 }
-    fn compare_partial(first: &Vec<Moon>, other: &Vec<Moon>, index: usize) -> bool{
-        for (a, b) in first.iter().zip(other){
-           if a.pos[index] != b.pos[index] {
-               return false
-           }
-       }
-       return true
+fn compare_partial(first: &Vec<Moon>, other: &Vec<Moon>, index: usize) -> bool{
+    for (a, b) in first.iter().zip(other){
+        if a.pos[index] != b.pos[index] {
+            return false
+        }
+        if a.velocity[index] != b.velocity[index] {
+            return false
+        }
     }
+    return true
+}
 
 impl PartialEq for Moon{
     fn eq(&self, other: &Moon) -> bool{
@@ -67,6 +76,20 @@ impl PartialEq for Moon{
         }
         return true
     }
+}
+
+fn pgcd(a: i64, b: i64) -> i64{
+    let leftover = a % b;
+    match leftover {
+        0 => b,
+        1 => 1,
+        _ => pgcd(b, leftover)
+    }
+}
+
+fn pgcm(a: i64, b: i64) -> i64 {
+    let divisor = pgcd(a, b);
+    a * b / divisor 
 }
 
 fn first_answer(orbits: &mut Vec<Moon>) -> u32{
@@ -82,11 +105,9 @@ fn first_answer(orbits: &mut Vec<Moon>) -> u32{
     result 
 }
 
-
-fn second_answer(orbits: &mut Vec<Moon>) -> u32{
+fn astro_simulator(orbits: &mut Vec<Moon>, tx: Sender<Cyclicity>){
     let start = orbits.clone();
-    let (mut n, mut count) = (0, 0);
-    let mut cycles = vec![0; 3];
+    let mut n = 1;
 
     loop {
         let new_orbits = orbits.clone();
@@ -95,26 +116,56 @@ fn second_answer(orbits: &mut Vec<Moon>) -> u32{
             moon.apply_velocity();
         }
         for i in 0..3{
-            if compare_partial(&start, &new_orbits, i) && cycles[i] == 0{
-                cycles[i] = n;
-                println!("{:?} {:?} {:?}", cycles, i, n);
-                for (a, b) in start.iter().zip(&new_orbits){
-                    println!("{:?} {:?}", a, b);
-                }
-                count += 1;
+            if compare_partial(&start, &orbits, i){
+                tx.send(Cyclicity{cycle: n , index: i});
             }
         }
         n += 1;
-        if n > 1 && start == new_orbits {
-                break;
+    }
+}
+
+fn compute_possibilities(rx: Receiver<Cyclicity>) -> (){
+} 
+
+fn second_answer(orbits: &mut Vec<Moon>) -> i64{
+    let start = orbits.clone();
+    let (mut n, mut count) = (1, 0);
+    let mut cycles = vec![0; 3];
+    let (tx, rx): (Sender<Cyclicity>, Receiver<Cyclicity>) = mpsc::channel();
+
+    loop {
+        let new_orbits = orbits.clone();
+
+        for moon in orbits.iter_mut(){
+            moon.apply_gravity(&new_orbits);
+            moon.apply_velocity();
+        }
+
+        for i in 0..3{
+            if compare_partial(&start, &orbits, i) && cycles[i] == 0 {
+                cycles[i] = n;
+    /*            
+                println!("{:?} {:?}", i, n);
+                println!("{:?}", start);
+                println!("{:?}", orbits);
+    */
+                count += 1;
+                
+            }
+        }
+
+        n += 1;
+
+        if start == *orbits || count >= 3{
+            break;
         }
     }
-    println!("{:?} {:?}", cycles, n);
+    println!("{:?}", pgcm(pgcm(cycles[0], cycles[1]), cycles[2]));
     n
 }
 
 fn main() {
-    let fileinput = read_file::read_input("../12.1.txt");
+    let fileinput = read_file::read_input("../12.txt");
     let mut orbits = fileinput.lines().map(|x| Moon::new(x)).collect::<Vec<Moon>>();
     first_answer(&mut orbits.clone());
     second_answer(&mut orbits.clone());
