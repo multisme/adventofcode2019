@@ -1,8 +1,8 @@
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-use std::collections::BTreeSet;
 
 fn read_input() -> std::string::String {
     let path = Path::new("../3.txt");
@@ -29,24 +29,36 @@ fn compute_paths(wire: &str, start: (i32, i32, i32)) -> BTreeSet<(i32, i32, i32)
     for m in moves {
         let direction = m.chars().nth(0).unwrap();
         let steps = m[1..].parse::<i32>().unwrap();
-        if direction == 'U'{
+        if direction == 'U' {
             let new_start = (start.0 + steps, start.1, total_moves);
-            let path = (start.0..new_start.0).map(|x| {total_moves += 1; (x, start.1, total_moves)});
+            let path = (start.0..new_start.0).map(|x| {
+                total_moves += 1;
+                (x, start.1, total_moves)
+            });
             coords.extend(path);
             start = new_start;
-        } else if direction == 'D'{
+        } else if direction == 'D' {
             let new_start = (start.0 - steps, start.1, total_moves);
-            let path = (new_start.0..start.0).map(|x| {total_moves += 1; (x, start.1, total_moves)});
+            let path = (new_start.0..start.0).map(|x| {
+                total_moves += 1;
+                (x, start.1, total_moves)
+            });
             coords.extend(path);
             start = new_start;
-        } else if direction == 'L'{
+        } else if direction == 'L' {
             let new_start = (start.0, start.1 - steps, total_moves);
-            let path = (new_start.1..start.1).map(|x| {total_moves += 1; (start.0, x, total_moves)});
+            let path = (new_start.1..start.1).map(|x| {
+                total_moves += 1;
+                (start.0, x, total_moves)
+            });
             coords.extend(path);
             start = new_start;
-        } else if direction == 'R'{
+        } else if direction == 'R' {
             let new_start = (start.0, start.1 + steps, total_moves);
-            let path = (start.1..new_start.1).map(|x| {total_moves += 1; (start.0, x, total_moves)});
+            let path = (start.1..new_start.1).map(|x| {
+                total_moves += 1;
+                (start.0, x, total_moves)
+            });
             coords.extend(path);
             start = new_start;
         }
@@ -69,7 +81,7 @@ fn main() {
         .map(|y| y.0.abs() + y.1.abs())
         .collect();
 
-   //  println!("{:?} \n\n {:?}", path1, path2);
+    //  println!("{:?} \n\n {:?}", path1, path2);
     distances.sort();
     println!("distances {:?}", distances);
     // Second answer

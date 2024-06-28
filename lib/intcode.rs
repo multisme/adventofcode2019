@@ -1,13 +1,12 @@
 // Nultithreading
-use std::sync::mpsc::{Sender, Receiver};
-use std::sync::mpsc;
 use std::collections::HashMap;
-
+use std::sync::mpsc;
+use std::sync::mpsc::{Receiver, Sender};
 
 #[derive(Debug)]
 pub struct Data {
     // The 'a defines a lifetime
-    intcode:  Vec<i64>,
+    intcode: Vec<i64>,
     rip: usize,
     relative_index: i64,
     input: Vec<i64>,
@@ -15,14 +14,13 @@ pub struct Data {
     output: i64,
     r#in: Option<Receiver<i64>>,
     output_channel: Option<Sender<i64>>,
-    mem_sup: HashMap<i64, i64>
+    mem_sup: HashMap<i64, i64>,
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct OutputSignal {
     phases: Vec<i64>,
-    signal: i64
+    signal: i64,
 }
 
 trait To10ext {
@@ -31,7 +29,8 @@ trait To10ext {
 
 impl To10ext for i64 {
     fn parse_decimal(&self) -> Vec<char> {
-        let result: Vec<char> = (self + 100000).to_string() // add 10 000 to be sure to catch the empty zeros before the int
+        let result: Vec<char> = (self + 100000)
+            .to_string() // add 10 000 to be sure to catch the empty zeros before the int
             .chars()
             .collect();
         result[1..].to_vec() //need to find a way to remove the first value
@@ -42,18 +41,18 @@ impl Data {
     pub fn new(intcode: Vec<i64>, input: Vec<i64>) -> Data {
         Data {
             intcode: intcode,
-            rip : 0,
+            rip: 0,
             relative_index: 0,
             input: input,
             input_index: 0,
             output: 0,
             mem_sup: HashMap::new(),
             r#in: None,
-            output_channel: None
+            output_channel: None,
         }
     }
 
-    pub fn r#move(data: &mut Data, address: i64, value: i64) -> (){
+    pub fn r#move(data: &mut Data, address: i64, value: i64) -> () {
         if address >= data.intcode.len() as i64 {
             let memory = data.mem_sup.entry(address).or_insert(value);
             *memory = value;
@@ -65,10 +64,10 @@ impl Data {
 
     pub fn deref(data: &mut Data, index: usize, positions_mode: char) -> i64 {
         let address = Data::get_address(data, index, positions_mode) as i64;
-        if address >= data.intcode.len() as i64{
+        if address >= data.intcode.len() as i64 {
             match data.mem_sup.get(&address) {
                 Some(value) => *value,
-                _ => {0}
+                _ => 0,
             }
         } else {
             data.intcode[address as usize]
@@ -79,13 +78,15 @@ impl Data {
         let address = match positions_mode {
             '0' => data.intcode[index] as i64,
             '1' => index as i64,
-            '2' => { (data.relative_index  + data.intcode[index])},
-            _  => {panic!("addressage is incorrect")}
+            '2' => (data.relative_index + data.intcode[index]),
+            _ => {
+                panic!("addressage is incorrect")
+            }
         };
         address
     }
 
-    pub fn add(data: &mut Data, index: &mut usize,  positions: Vec<char> ) -> () {
+    pub fn add(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
         let output_address = Data::get_address(data, *index + 3, positions[0]);
         let val2 = Data::deref(data, *index + 2, positions[1]);
         let val1 = Data::deref(data, *index + 1, positions[2]);
@@ -93,7 +94,7 @@ impl Data {
         *index += 4;
     }
 
-    pub fn multiply(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->() {
+    pub fn multiply(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
         //  println!("instructions {:?} {:?} {:?}", data.intcode[index], index, positions);
         let output_address = Data::get_address(data, *index + 3, positions[0]);
         let val2 = Data::deref(data, *index + 2, positions[1]);
@@ -102,19 +103,19 @@ impl Data {
         *index += 4;
     }
 
-
-    pub fn display(data: &mut Data, index: &mut usize,  positions: Vec<char>) -> () {
+    pub fn display(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
         data.output = Data::deref(data, *index + 1, positions[2]);
         let ouput_entry = &data.output_channel;
         *index += 2;
         match ouput_entry {
-            Some(rx) => { rx.send(data.output).unwrap(); }
-            _ => return
+            Some(rx) => {
+                rx.send(data.output).unwrap();
+            }
+            _ => return,
         }
     }
 
-
-    pub fn jump_if_true(data: &mut Data, index: &mut usize,  positions: Vec<char>) -> () {
+    pub fn jump_if_true(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
         if Data::deref(data, *index + 1, positions[2]) != 0 {
             *index = Data::deref(data, *index + 2, positions[1]) as usize;
         } else {
@@ -122,7 +123,7 @@ impl Data {
         }
     }
 
-    pub fn jump_if_false(data: &mut Data, index: &mut usize,  positions: Vec<char>) -> () {
+    pub fn jump_if_false(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
         if Data::deref(data, *index + 1, positions[2]) == 0 {
             *index = Data::deref(data, *index + 2, positions[1]) as usize;
         } else {
@@ -130,9 +131,7 @@ impl Data {
         }
     }
 
-
-    pub fn less_than(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->() {
-
+    pub fn less_than(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
         let address = Data::get_address(data, *index + 3, positions[0]);
         let val2 = Data::deref(data, *index + 2, positions[1]);
         let val1 = Data::deref(data, *index + 1, positions[2]);
@@ -141,8 +140,7 @@ impl Data {
         *index += 4;
     }
 
-
-    pub fn equal(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->() {
+    pub fn equal(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
         let address = Data::get_address(data, *index + 3, positions[0]);
         let val2 = Data::deref(data, *index + 2, positions[1]);
         let val1 = Data::deref(data, *index + 1, positions[2]);
@@ -151,17 +149,16 @@ impl Data {
         *index += 4;
     }
 
+    pub fn _nothing(_data: &mut Data, _index: &mut usize, _positions: Vec<char>) -> () {}
 
-    pub fn _nothing(_data: &mut Data, _index: &mut usize,  _positions: Vec<char> ) ->() {
-    }
-
-
-    pub fn store(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->() {
+    pub fn store(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
         if data.input.len() <= data.input_index {
             let input = &data.r#in;
-            match input{
-                Some(rx) => {data.input.push(rx.recv().unwrap())},
-                _ => { panic!("missing output") } 
+            match input {
+                Some(rx) => data.input.push(rx.recv().unwrap()),
+                _ => {
+                    panic!("missing output")
+                }
             }
         }
         let address = Data::get_address(data, *index + 1, positions[2]);
@@ -182,7 +179,7 @@ impl Data {
         let len = data.intcode.len();
 
         while index < len {
-            let instructions = data.intcode[index].parse_decimal(); 
+            let instructions = data.intcode[index].parse_decimal();
             //println!("{:?} {:?}", index, instructions); // Debug
             match instructions.as_slice() {
                 [_, _, _, _, '1'] => Data::add(data, &mut index, instructions),
@@ -194,13 +191,14 @@ impl Data {
                 [_, _, _, _, '7'] => Data::less_than(data, &mut index, instructions),
                 [_, _, _, _, '8'] => Data::equal(data, &mut index, instructions),
                 [_, _, _, '0', '9'] => Data::stack_change(data, &mut index, instructions),
-                [_, _, _, '9', '9'] => { break },
-                _ => { panic!("error {:?}, {:?}", instructions, index);}
+                [_, _, _, '9', '9'] => break,
+                _ => {
+                    panic!("error {:?}, {:?}", instructions, index);
+                }
             }
         }
         index
     }
-
 
     pub fn connect_amps(input_amp: &mut Data, output_amp: &mut Data) -> () {
         let (tx, rx): (Sender<i64>, Receiver<i64>) = mpsc::channel();
@@ -208,12 +206,12 @@ impl Data {
         input_amp.r#in = Some(rx);
     }
 
-    pub fn get_input_channel(&mut self) -> Sender<i64>{
+    pub fn get_input_channel(&mut self) -> Sender<i64> {
         let (tx, rx): (Sender<i64>, Receiver<i64>) = mpsc::channel();
         self.r#in = Some(rx);
         tx
     }
-    pub fn get_output_channel(&mut self) -> Receiver<i64>{
+    pub fn get_output_channel(&mut self) -> Receiver<i64> {
         let (tx, rx): (Sender<i64>, Receiver<i64>) = mpsc::channel();
         self.output_channel = Some(tx);
         rx

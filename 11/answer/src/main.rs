@@ -1,87 +1,91 @@
-use std::collections::BTreeMap;
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 
 use std::thread;
 mod intcode;
 mod read_file;
 
-#[derive(Clone)]
-#[derive(Copy)]
-#[derive(Debug)]
-enum Move{
+#[derive(Clone, Copy, Debug)]
+enum Move {
     Left,
-    Right
+    Right,
 }
 
-#[derive(Clone)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Orientation {
     North,
     East,
     South,
-    West
+    West,
 }
 
-#[derive(Clone)]
-#[derive(Copy)]
-#[derive(Debug)]
-enum Color{
+#[derive(Clone, Copy, Debug)]
+enum Color {
     Black = 0,
-    White = 1
+    White = 1,
 }
 
-impl Color{
-    fn compute_color(value: i64) -> Color{
+impl Color {
+    fn compute_color(value: i64) -> Color {
         match value {
             0 => Color::Black,
             1 => Color::White,
-            _ => panic!("color not existing")
+            _ => panic!("color not existing"),
         }
     }
 }
 
 struct Robot {
     pos: Coord,
-    path: BTreeMap<Coord, Color>
+    path: BTreeMap<Coord, Color>,
 }
 
-#[derive(Clone)]
-#[derive(Debug)]
-struct  Coord{
+#[derive(Clone, Debug)]
+struct Coord {
     x: i64,
     y: i64,
-    orientation: Orientation
+    orientation: Orientation,
 }
 
-impl PartialEq for Coord{
+impl PartialEq for Coord {
     fn eq(&self, other: &Coord) -> bool {
         self.x == other.x && self.y == other.y
     }
 }
 
-impl PartialOrd for Coord{
+impl PartialOrd for Coord {
     fn partial_cmp(&self, other: &Coord) -> Option<Ordering> {
         Some((self.x, self.y).cmp(&(other.x, other.y)))
     }
 }
 
-impl Ord for Coord{
+impl Ord for Coord {
     fn cmp(&self, other: &Coord) -> Ordering {
         (self.x, self.y).cmp(&(other.x, other.y))
     }
 }
 
+impl Eq for Coord {}
 
-impl Eq for Coord{
-}
-
-impl Coord{
-    fn compute_move(&mut self, m: Move){
+impl Coord {
+    fn compute_move(&mut self, m: Move) {
         match (&self.orientation, m) {
-            (Orientation::West, Move::Left) | (Orientation::East, Move::Right) =>  { self.orientation = Orientation::South; self.y -= 1 }
-            (Orientation::West, Move::Right) | (Orientation::East, Move::Left) => { self.orientation = Orientation::North; self.y += 1 }
-            (Orientation::North, Move::Left) | (Orientation::South, Move::Right) => { self.orientation = Orientation::West; self.x -= 1 }
-            (Orientation::North, Move::Right) | (Orientation::South, Move::Left) => {self.orientation = Orientation::East; self.x += 1}
+            (Orientation::West, Move::Left) | (Orientation::East, Move::Right) => {
+                self.orientation = Orientation::South;
+                self.y -= 1
+            }
+            (Orientation::West, Move::Right) | (Orientation::East, Move::Left) => {
+                self.orientation = Orientation::North;
+                self.y += 1
+            }
+            (Orientation::North, Move::Left) | (Orientation::South, Move::Right) => {
+                self.orientation = Orientation::West;
+                self.x -= 1
+            }
+            (Orientation::North, Move::Right) | (Orientation::South, Move::Left) => {
+                self.orientation = Orientation::East;
+                self.x += 1
+            }
         }
     }
 }
@@ -89,8 +93,12 @@ impl Coord{
 impl Robot {
     fn new() -> Robot {
         Robot {
-            pos: Coord {x: 0, y: 0, orientation: Orientation::North},
-            path: BTreeMap::new()
+            pos: Coord {
+                x: 0,
+                y: 0,
+                orientation: Orientation::North,
+            },
+            path: BTreeMap::new(),
         }
     }
 
@@ -99,8 +107,8 @@ impl Robot {
         self.pos.compute_move(m);
     }
 
-    fn detect_color(&mut self) -> Color{
-        match self.path.get(&self.pos){
+    fn detect_color(&mut self) -> Color {
+        match self.path.get(&self.pos) {
             Some(x) => *x,
             None => Color::Black,
         }
@@ -108,16 +116,16 @@ impl Robot {
 }
 
 impl Move {
-    fn compute_move(m: i64) -> Move{
+    fn compute_move(m: i64) -> Move {
         match m {
             0 => Move::Left,
             1 => Move::Right,
-            _ => panic!("move not existing")
+            _ => panic!("move not existing"),
         }
     }
 }
 
-fn paint(automat: &mut Robot, intcode: &Vec<i64>, input: Vec<i64>) -> (){
+fn paint(automat: &mut Robot, intcode: &Vec<i64>, input: Vec<i64>) -> () {
     let mut paint = true;
     let mut color_to_paint = Color::Black;
     let mut data = intcode::Data::new(intcode.clone(), input);
@@ -125,12 +133,10 @@ fn paint(automat: &mut Robot, intcode: &Vec<i64>, input: Vec<i64>) -> (){
     let tx = data.get_output_channel();
 
     // Run the intcode
-    let  code = thread::spawn(move || {
-        intcode::Data::run_data(&mut data)
-    });
+    let code = thread::spawn(move || intcode::Data::run_data(&mut data));
 
     // Get the result of the intcode and process it as either a move or a painting action
-    for p in tx.iter(){
+    for p in tx.iter() {
         if paint == false {
             let m = Move::compute_move(p);
             automat.apply_move(m, color_to_paint);
@@ -138,7 +144,7 @@ fn paint(automat: &mut Robot, intcode: &Vec<i64>, input: Vec<i64>) -> (){
         } else {
             color_to_paint = Color::compute_color(p);
         }
-        paint =!paint
+        paint = !paint
     }
     code.join().unwrap();
 }
@@ -151,29 +157,31 @@ fn first_answer(intcode: &Vec<i64>) -> usize {
     result
 }
 
-
 fn second_answer(intcode: &Vec<i64>) -> () {
     let mut automat = Robot::new();
     paint(&mut automat, &intcode, vec![1]);
 
-
-    let len = automat.path.len() as i64 ;
+    let len = automat.path.len() as i64;
     let mut result = String::new();
     let xs = &automat.path.iter().map(|x| x.0.x);
     let (startx, endx) = (xs.clone().min().unwrap(), xs.clone().max().unwrap());
     let ys = &automat.path.iter().map(|y| y.0.y);
     let (starty, endy) = (ys.clone().min().unwrap(), ys.clone().max().unwrap());
-    let (mut i, mut j) = (startx  - 1, starty - 1);
+    let (mut i, mut j) = (startx - 1, starty - 1);
 
-while i < endx + 1{
-    while j < endy + 1{
-            match automat.path.get(&Coord{x: i, y: j, orientation: Orientation::North}){
-                 Some(x) => match x {
-                     Color::Black => result.push(' '),
-                     Color::White => result.push('x')
-                 },
-                    _ => result.push(' ')
-                 }
+    while i < endx + 1 {
+        while j < endy + 1 {
+            match automat.path.get(&Coord {
+                x: i,
+                y: j,
+                orientation: Orientation::North,
+            }) {
+                Some(x) => match x {
+                    Color::Black => result.push(' '),
+                    Color::White => result.push('x'),
+                },
+                _ => result.push(' '),
+            }
             j += 1;
         }
         result.push('\n');
@@ -183,16 +191,16 @@ while i < endx + 1{
     println!("{}", result);
 }
 
-
-    fn main() {
-        let file_input = read_file::read_input("../11.txt");
-        let input = match file_input.split_whitespace().next(){
-            Some(s) =>s,
-            None => ""
-        };
-        let intcode: Vec<i64> = input.split(",")
-            .map(|x| x.parse::<i64>().unwrap())
-            .collect();
-        first_answer(&intcode);
-        second_answer(&intcode);
-    }
+fn main() {
+    let file_input = read_file::read_input("../11.txt");
+    let input = match file_input.split_whitespace().next() {
+        Some(s) => s,
+        None => "",
+    };
+    let intcode: Vec<i64> = input
+        .split(",")
+        .map(|x| x.parse::<i64>().unwrap())
+        .collect();
+    first_answer(&intcode);
+    second_answer(&intcode);
+}

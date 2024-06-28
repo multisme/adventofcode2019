@@ -1,16 +1,14 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-use std::collections::HashMap;
 
-#[derive(Debug)]
-#[derive(Clone)]
-struct Node<'a>{
+#[derive(Debug, Clone)]
+struct Node<'a> {
     name: &'a str,
     count: u32,
-    before: Vec<&'a str>
+    before: Vec<&'a str>,
 }
-
 
 fn read_input(file_location: &str) -> std::string::String {
     //  let path = Path::new("../4.test0.txt"); //test file
@@ -20,33 +18,33 @@ fn read_input(file_location: &str) -> std::string::String {
     let mut file = match File::open(&path) {
         Err(why) => panic!("couldn't open the file {}: {}", display, why.to_string()),
         Ok(file) => file,
-    };  
+    };
     let mut s = String::new();
     match file.read_to_string(&mut s) {
         Err(why) => panic!("couldn't read {}:  {}", display, why.to_string()),
-        Ok(_) => (), 
+        Ok(_) => (),
     };
-    s   
+    s
 }
 
-fn _print_graph(graph: &HashMap<&str, Node>){
-    for (name, node) in graph{
+fn _print_graph(graph: &HashMap<&str, Node>) {
+    for (name, node) in graph {
         println!("{:?}, {:?}, {:?}", name, node.name, node.count);
     }
 }
 
-fn compute_path_to_center<'a>(star_chart: &'a HashMap<&str, Node>, name: &str) -> Vec<&'a str>{
+fn compute_path_to_center<'a>(star_chart: &'a HashMap<&str, Node>, name: &str) -> Vec<&'a str> {
     let mut path = Vec::new();
     let mut end = false;
     let mut current_node = star_chart.get(name).unwrap();
 
-    while end == false{
+    while end == false {
         match star_chart.get(current_node.name) {
             Some(previous) => {
                 path.push(current_node.name);
                 current_node = previous;
-            },
-            _ => { end = true }
+            }
+            _ => end = true,
         }
     }
     return path;
@@ -57,32 +55,29 @@ fn count_orbits(star_chart: &mut HashMap<&str, Node>, name: &str) -> u32 {
         Some(previous) => {
             let name = previous.name;
             count_orbits(star_chart, name) + 1
-        },
-        _ => 0 
+        }
+        _ => 0,
     }
 }
 
-fn compute_chart_orbits(star_chart: &mut HashMap<&str, Node>) -> u32{
+fn compute_chart_orbits(star_chart: &mut HashMap<&str, Node>) -> u32 {
     let mut final_count: u32 = 0;
-    for (name, node) in  &mut star_chart.clone().to_owned() {
+    for (name, node) in &mut star_chart.clone().to_owned() {
         if node.count == 0 {
             let count = count_orbits(star_chart, name);
             node.count = count;
             final_count += count;
         }
     }
-    return final_count
+    return final_count;
 }
 
-
-
-fn compute_path_spaceship(star_chart: &mut HashMap<&str, Node>) -> usize{
-
+fn compute_path_spaceship(star_chart: &mut HashMap<&str, Node>) -> usize {
     let start = compute_path_to_center(star_chart, "YOU");
-    let end = compute_path_to_center(star_chart, "SAN") ; 
-    for (index, object) in start.iter().enumerate(){
-        for (index2, others) in end.iter().enumerate(){
-            if others == object{
+    let end = compute_path_to_center(star_chart, "SAN");
+    for (index, object) in start.iter().enumerate() {
+        for (index2, others) in end.iter().enumerate() {
+            if others == object {
                 return (index) + (index2);
             }
         }
@@ -90,15 +85,21 @@ fn compute_path_spaceship(star_chart: &mut HashMap<&str, Node>) -> usize{
     0
 }
 
-fn get_data(input: std::str::SplitWhitespace) -> HashMap<&str, Node>{
-
+fn get_data(input: std::str::SplitWhitespace) -> HashMap<&str, Node> {
     let mut graph: HashMap<&str, Node> = HashMap::new();
     let mut direct_orbit: Vec<&str>;
-    for current in input{
+    for current in input {
         direct_orbit = current.split(")").collect();
         let object = direct_orbit[0];
         let satellite = direct_orbit[1];
-        graph.insert(satellite, Node {name: object, count: 0, before: Vec::new()});
+        graph.insert(
+            satellite,
+            Node {
+                name: object,
+                count: 0,
+                before: Vec::new(),
+            },
+        );
     }
     graph
 }

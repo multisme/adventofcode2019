@@ -4,44 +4,49 @@ use std::path::Path;
 // Used for Permutation
 use itertools::Itertools;
 // Nultithreading
-use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
+use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
-
 
 #[derive(Debug)]
 struct Data {
     // The 'a defines a lifetime
-    memory:  Vec<i32>,
+    memory: Vec<i32>,
     memory_index: usize,
     input: Vec<i32>,
     input_index: usize,
     output: i32,
     input_channel: Option<Receiver<i32>>,
-    output_channel: Option<Sender<i32>>
+    output_channel: Option<Sender<i32>>,
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct OutputSignal {
     phases: Vec<i32>,
-    signal: i32
+    signal: i32,
 }
 
-fn add(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->(){
+fn add(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
     //  println!("instructions {:?} {:?} {:?}", memory[index], index, positions);
     let output = data.memory[*index + 3] as usize;
     let mark = data.memory[*index + 2];
-    let val2 = if positions[1] == '0' { data.memory[mark as usize] } else {mark} ;
+    let val2 = if positions[1] == '0' {
+        data.memory[mark as usize]
+    } else {
+        mark
+    };
     let mark = data.memory[*index + 1];
-    let val1 = if positions[2] == '0' { data.memory[mark as usize] } else {mark} ;
+    let val1 = if positions[2] == '0' {
+        data.memory[mark as usize]
+    } else {
+        mark
+    };
     data.memory[output as usize] = val1 + val2;
     *index += 4;
 }
 
-
-fn display(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
-    if positions[2] == '1'{
+fn display(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
+    if positions[2] == '1' {
         let address = *index + 1;
         //     println!("{:?}", data.memory[address]);
         data.output = data.memory[address]
@@ -53,142 +58,180 @@ fn display(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
     let ouput_entry = &data.output_channel;
     *index += 2;
     match ouput_entry {
-        Some(rx) => { rx.send(data.output); }
-        _ => return
+        Some(rx) => {
+            rx.send(data.output);
+        }
+        _ => return,
     }
 }
 
-
-fn jump_if_true(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
-    let address = if positions[2] == '0' { data.memory[*index + 1] as usize } else { *index + 1 };
+fn jump_if_true(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
+    let address = if positions[2] == '0' {
+        data.memory[*index + 1] as usize
+    } else {
+        *index + 1
+    };
     if data.memory[address] != 0 {
-        let address = if positions[1] == '0' { data.memory[*index + 2] as usize} else { *index + 2 };
+        let address = if positions[1] == '0' {
+            data.memory[*index + 2] as usize
+        } else {
+            *index + 2
+        };
         *index = data.memory[address] as usize;
     } else {
         *index += 3;
     }
 }
 
-fn jump_if_false(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
-    let address = if positions[2] == '0' { data.memory[*index + 1] as usize} else { *index + 1 };
+fn jump_if_false(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
+    let address = if positions[2] == '0' {
+        data.memory[*index + 1] as usize
+    } else {
+        *index + 1
+    };
     if data.memory[address] == 0 {
-        let address = if positions[1] == '0' { data.memory[*index + 2] as usize} else { *index + 2 };
+        let address = if positions[1] == '0' {
+            data.memory[*index + 2] as usize
+        } else {
+            *index + 2
+        };
         *index = data.memory[address] as usize;
     } else {
         *index += 3;
     }
 }
 
-
-fn less_than(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
-
-    let address = if positions[3] == '0'{ data.memory[*index + 3] as usize } else { *index + 3 };
+fn less_than(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
+    let address = if positions[3] == '0' {
+        data.memory[*index + 3] as usize
+    } else {
+        *index + 3
+    };
     let mark = data.memory[*index + 2];
-    let val2 = if positions[1] == '0' { data.memory[mark as usize] } else {mark} ;
+    let val2 = if positions[1] == '0' {
+        data.memory[mark as usize]
+    } else {
+        mark
+    };
     let mark = data.memory[*index + 1];
-    let val1 = if positions[2] == '0' { data.memory[mark as usize] } else {mark} ;
+    let val1 = if positions[2] == '0' {
+        data.memory[mark as usize]
+    } else {
+        mark
+    };
     data.memory[address] = if val1 < val2 { 1 } else { 0 };
     *index += 4;
 }
 
-
-fn equal(data: &mut Data, index: &mut usize,  positions: Vec<char>) ->(){
-    let address = if positions[3] == '0'{ data.memory[*index + 3] as usize } else { *index + 3 };
+fn equal(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
+    let address = if positions[3] == '0' {
+        data.memory[*index + 3] as usize
+    } else {
+        *index + 3
+    };
     let mark = data.memory[*index + 2];
-    let val2 = if positions[1] == '0' { data.memory[mark as usize] } else {mark} ;
+    let val2 = if positions[1] == '0' {
+        data.memory[mark as usize]
+    } else {
+        mark
+    };
     let mark = data.memory[*index + 1];
-    let val1 = if positions[2] == '0' { data.memory[mark as usize] } else {mark} ;
+    let val1 = if positions[2] == '0' {
+        data.memory[mark as usize]
+    } else {
+        mark
+    };
     data.memory[address] = if val1 == val2 { 1 } else { 0 };
     *index += 4;
 }
 
-
-fn multiply(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->(){
+fn multiply(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
     //  println!("instructions {:?} {:?} {:?}", data.memory[index], index, positions);
     let output = data.memory[*index + 3] as usize;
     let mark = data.memory[*index + 2];
-    let val2 = if positions[1] == '0' { data.memory[mark as usize] } else {mark} ;
+    let val2 = if positions[1] == '0' {
+        data.memory[mark as usize]
+    } else {
+        mark
+    };
     let mark = data.memory[*index + 1];
-    let val1 = if positions[2] == '0' { data.memory[mark as usize] } else {mark} ;
+    let val1 = if positions[2] == '0' {
+        data.memory[mark as usize]
+    } else {
+        mark
+    };
     data.memory[output as usize] = val1 * val2;
     *index += 4;
 }
 
+fn _nothing(_data: &mut Data, _index: &mut usize, _positions: Vec<char>) -> () {}
 
-fn _nothing(_data: &mut Data, _index: &mut usize,  _positions: Vec<char> ) ->(){
-}
-
-
-fn store(data: &mut Data, index: &mut usize,  positions: Vec<char> ) ->(){
+fn store(data: &mut Data, index: &mut usize, positions: Vec<char>) -> () {
     if data.input.len() <= data.input_index {
         let input = &data.input_channel;
-        match input{
-            Some(rx) => { data.input.push(rx.recv().unwrap())},
-            _ => return
+        match input {
+            Some(rx) => data.input.push(rx.recv().unwrap()),
+            _ => return,
         }
     }
-    if positions[2] == '1'{
+    if positions[2] == '1' {
         let address = *index + 1;
         data.memory[address] = data.input[data.input_index];
     } else {
         let address = data.memory[(*index + 1)] as usize;
-        data.memory[address] = data.input[data.input_index]; 
+        data.memory[address] = data.input[data.input_index];
     }
     data.input_index += 1;
     *index += 2;
 }
 
-
 trait To10ext {
     fn parse_decimal(&self) -> Vec<char>;
 }
 
-
 impl To10ext for i32 {
     fn parse_decimal(&self) -> Vec<char> {
-        let result: Vec<char> = (self + 100000).to_string() // add 10 000 to be sure to catch the empty zeros before the int
+        let result: Vec<char> = (self + 100000)
+            .to_string() // add 10 000 to be sure to catch the empty zeros before the int
             .chars()
             .collect();
         result[1..].to_vec() //need to find a way to remove the first value
     }
 }
 
-
 fn run_data(data: &mut Data) -> usize {
     let mut index: usize = data.memory_index;
     let len = data.memory.len();
 
     while index < len {
-
-        let positions = data.memory[index].parse_decimal(); 
+        let positions = data.memory[index].parse_decimal();
         let instruction = positions[4];
-        if instruction == '1'{
+        if instruction == '1' {
             add(data, &mut index, positions);
-        } else if instruction == '2'{
+        } else if instruction == '2' {
             multiply(data, &mut index, positions);
-        }else if instruction == '3' {
+        } else if instruction == '3' {
             store(data, &mut index, positions);
         } else if instruction == '4' {
             display(data, &mut index, positions);
-        } else if instruction == '5'{
+        } else if instruction == '5' {
             jump_if_true(data, &mut index, positions);
-        } else if instruction == '6'{
+        } else if instruction == '6' {
             jump_if_false(data, &mut index, positions);
-        } else if instruction == '7'{
+        } else if instruction == '7' {
             less_than(data, &mut index, positions);
-        } else if instruction == '8'{
+        } else if instruction == '8' {
             equal(data, &mut index, positions);
         } else if instruction == '9' {
-            break
-        } else{
+            break;
+        } else {
             println!("error");
-            break
+            break;
         }
         //            println!("{:?} {:?}", data, index);
     }
     index
 }
-
 
 fn read_input(file_location: &str) -> std::string::String {
     //  let path = Path::new("../4.test0.txt"); //test file
@@ -198,29 +241,51 @@ fn read_input(file_location: &str) -> std::string::String {
     let mut file = match File::open(&path) {
         Err(why) => panic!("couldn't open the file {}: {}", display, why.to_string()),
         Ok(file) => file,
-    };  
+    };
     let mut s = String::new();
     match file.read_to_string(&mut s) {
         Err(why) => panic!("couldn't read {}:  {}", display, why.to_string()),
-        Ok(_) => (), 
+        Ok(_) => (),
     };
-    s   
+    s
 }
 
-
-fn first_answer(memory: &Vec<i32>) -> (){
+fn first_answer(memory: &Vec<i32>) -> () {
     let mut results_1: Vec<OutputSignal> = Vec::new();
     //try all permutations
-    for p in  (0..5).permutations(5){
-        let mut data = Data {memory: memory.clone(), memory_index: 0, input: vec![], input_index: 0, output: 0, input_channel: None, output_channel: None};
+    for p in (0..5).permutations(5) {
+        let mut data = Data {
+            memory: memory.clone(),
+            memory_index: 0,
+            input: vec![],
+            input_index: 0,
+            output: 0,
+            input_channel: None,
+            output_channel: None,
+        };
         for phase in &p {
             data.input_index = 0;
             data.input = vec![*phase, data.output];
             run_data(&mut data);
         }
-        results_1.push(OutputSignal {phases: p.clone(), signal: data.output});
+        results_1.push(OutputSignal {
+            phases: p.clone(),
+            signal: data.output,
+        });
     }
-    let max = results_1.iter().fold(OutputSignal{phases: vec![], signal: 0}, |a, b| {if a.signal > b.signal {a} else {b.clone()}});
+    let max = results_1.iter().fold(
+        OutputSignal {
+            phases: vec![],
+            signal: 0,
+        },
+        |a, b| {
+            if a.signal > b.signal {
+                a
+            } else {
+                b.clone()
+            }
+        },
+    );
     println!("First answer [phase, value]{:?}", max);
 }
 
@@ -230,15 +295,55 @@ fn connect_amps(input_amp: &mut Data, output_amp: &mut Data) -> () {
     input_amp.input_channel = Some(rx);
 }
 
-fn second_answer(memory: &Vec<i32>) -> (){
+fn second_answer(memory: &Vec<i32>) -> () {
     let mut results_2: Vec<OutputSignal> = Vec::new();
 
-    for p in  (5..10).permutations(5){
-        let mut amp_a = Data {memory: memory.clone(), memory_index: 0, input: vec![p[0], 0], input_index: 0, output: 0, input_channel: None, output_channel: None};
-        let mut amp_b = Data {memory: memory.clone(), memory_index: 0, input: vec![p[1]], input_index: 0, output: 0, input_channel: None, output_channel: None};
-        let mut amp_c = Data {memory: memory.clone(), memory_index: 0, input: vec![p[2]], input_index: 0, output: 0, input_channel: None, output_channel: None};
-        let mut amp_d = Data {memory: memory.clone(), memory_index: 0, input: vec![p[3]], input_index: 0, output: 0, input_channel: None, output_channel: None};
-        let mut amp_e = Data {memory: memory.clone(), memory_index: 0, input: vec![p[4]], input_index: 0, output: 0, input_channel: None, output_channel: None};
+    for p in (5..10).permutations(5) {
+        let mut amp_a = Data {
+            memory: memory.clone(),
+            memory_index: 0,
+            input: vec![p[0], 0],
+            input_index: 0,
+            output: 0,
+            input_channel: None,
+            output_channel: None,
+        };
+        let mut amp_b = Data {
+            memory: memory.clone(),
+            memory_index: 0,
+            input: vec![p[1]],
+            input_index: 0,
+            output: 0,
+            input_channel: None,
+            output_channel: None,
+        };
+        let mut amp_c = Data {
+            memory: memory.clone(),
+            memory_index: 0,
+            input: vec![p[2]],
+            input_index: 0,
+            output: 0,
+            input_channel: None,
+            output_channel: None,
+        };
+        let mut amp_d = Data {
+            memory: memory.clone(),
+            memory_index: 0,
+            input: vec![p[3]],
+            input_index: 0,
+            output: 0,
+            input_channel: None,
+            output_channel: None,
+        };
+        let mut amp_e = Data {
+            memory: memory.clone(),
+            memory_index: 0,
+            input: vec![p[4]],
+            input_index: 0,
+            output: 0,
+            input_channel: None,
+            output_channel: None,
+        };
         connect_amps(&mut amp_a, &mut amp_b);
         connect_amps(&mut amp_b, &mut amp_c);
         connect_amps(&mut amp_c, &mut amp_d);
@@ -252,18 +357,33 @@ fn second_answer(memory: &Vec<i32>) -> (){
         Datas.push(amp_d);
         Datas.push(amp_e);
         let mut processes: Vec<std::thread::JoinHandle<OutputSignal>> = Vec::new();
-        for mut amp in Datas{
+        for mut amp in Datas {
             let temp = p.clone();
-            processes.push( thread::spawn(move || {
+            processes.push(thread::spawn(move || {
                 run_data(&mut amp);
-                OutputSignal {phases: temp, signal: amp.output}
+                OutputSignal {
+                    phases: temp,
+                    signal: amp.output,
+                }
             }));
         }
         for p in processes {
             results_2.push(p.join().unwrap());
         }
     }
-    let max = results_2.iter().fold(OutputSignal{phases: vec![], signal: 0}, |a, b| {if a.signal > b.signal {a} else {b.clone()}});
+    let max = results_2.iter().fold(
+        OutputSignal {
+            phases: vec![],
+            signal: 0,
+        },
+        |a, b| {
+            if a.signal > b.signal {
+                a
+            } else {
+                b.clone()
+            }
+        },
+    );
     println!("{:?}", max)
 }
 
@@ -273,10 +393,13 @@ fn main() {
     //Get the right data from the input
     let input: &str = match file_input.split_whitespace().next() {
         Some(s) => s,
-        None => ""
+        None => "",
     };
     //println!(" The input is: {:?}", input);
-    let memory: Vec<i32> = input.split(",").map(|x| x.parse::<i32>().unwrap()).collect();
-//    first_answer(&memory);
+    let memory: Vec<i32> = input
+        .split(",")
+        .map(|x| x.parse::<i32>().unwrap())
+        .collect();
+    //    first_answer(&memory);
     second_answer(&memory);
 }
